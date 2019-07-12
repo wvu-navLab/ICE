@@ -28,6 +28,9 @@ include(GtsamMakeConfigFile)
 set(GTSAM_SOURCE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 message(STATUS "GTSAM_SOURCE_ROOT_DIR: [${GTSAM_SOURCE_ROOT_DIR}]")
 
+include_directories(BEFORE SYSTEM "${GTSAM_SOURCE_ROOT_DIR}/../../../include/")
+# link_directories()
+
 # Load build type flags and default to Debug mode
 include(GtsamBuildTypes)
 

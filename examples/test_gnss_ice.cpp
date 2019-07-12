@@ -18,7 +18,10 @@
 #include <gtsam/configReader/ConfDataReader.hpp>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/gnssNavigation/PseudorangeFactor.h>
+#include <gtsam/gnssNavigation/GNSSMultiModalFactor.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
+
+
 
 // LibCluster
 #include <libcluster/merge.h>
@@ -76,7 +79,6 @@ int main(int argc, char* argv[])
         bool printECEF, printENU, printAmb, first_ob(true);
         Eigen::MatrixXd residuals;
         vector<mixtureComponents> globalMixtureModel;
-
 
 
         cout.precision(12);
@@ -173,6 +175,16 @@ int main(int argc, char* argv[])
 
         residuals.setZero(1000,2);
 
+        // init. mixture model.
+        // Init this from file later
+        Eigen::RowVectorXd m(2);
+        m << 0.0, 0.0;
+
+        Eigen::MatrixXd c(2,2);
+        c<< rangeWeight, 0.0, 0.0, phaseWeight;
+
+        globalMixtureModel.push_back(boost::make_tuple(0, 0, 0.0, m, c));
+
         for(unsigned int i = startEpoch; i < data.size(); i++ ) {
 
                 // Get the current epoch's observables
@@ -205,8 +217,7 @@ int main(int argc, char* argv[])
                         phase_arc[svn] = phase_break;
                 }
 
-                // Add range/phase factor
-                graph->add(boost::make_shared<GNSSFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, diagNoise::Variances( (gtsam::Vector(2) << rangeWeight, phaseWeight).finished() )));
+                graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, diagNoise::Variances( (gtsam::Vector(2) << rangeWeight, phaseWeight).finished() ), globalMixtureModel));
 
                 prn_vec.push_back(svn);
                 factor_count_vec.push_back(++factor_count);
@@ -266,18 +277,17 @@ int main(int argc, char* argv[])
 
                                 learnVDP(residuals, qZ, weights, clusters);
 
+                                globalMixtureModel = mergeMixtureModel(residuals, qZ, globalMixtureModel, clusters, weights, 0.05, 10);
 
-                                globalMixtureModel = mergeMixtureModel(residuals, qZ, globalMixtureModel, clusters, weights, 0.02, 10);
-
-                                cout << "\n\n\n\n\n\n" << endl;
-                                cout << "----------------- Merged MODEL ----------------" << endl;
-                                for (int i=0; i<globalMixtureModel.size(); i++)
-                                {
-                                        mixtureComponents mc = globalMixtureModel[i];
-                                        auto cov = mc.get<4>();
-                                        cout << mc.get<0>() << " " << mc.get<1>() << " "  <<  mc.get<2>() << "    " << mc.get<3>() <<"     "<< cov(0,0) << " " << cov(0,1) << " " << cov(1,1) <<"     "<<"\n\n" << endl;
-                                }
-
+                                // cout << "\n\n\n\n\n\n" << endl;
+                                // cout << "----------------- Merged MODEL ----------------" << endl;
+                                // for (int i=0; i<globalMixtureModel.size(); i++)
+                                // {
+                                //         mixtureComponents mc = globalMixtureModel[i];
+                                //         auto cov = mc.get<4>();
+                                //         cout << mc.get<0>() << " " << mc.get<1>() << " "  <<  mc.get<2>() << "    " << mc.get<3>() <<"     "<< cov(0,0) << " " << cov(0,1) << " " << cov(1,1) <<"     "<<"\n\n" << endl;
+                                // }
+                                //
 
                                 residuals.setZero(1000,2);
                                 res_count = -1;

@@ -284,3 +284,34 @@ vector<merge::mixtureComponents> merge::mergeMixtureModel(Eigen::MatrixXd data, 
         gmm = pruneMixtureModel(gmm, truncLevel);
         return gmm;
 }
+
+
+merge::observationModel merge::getMixtureComponent(vector<merge::mixtureComponents> gmm, Eigen::VectorXd observation)
+{
+
+        int idx = 0;
+        double maxProb = 0, modelProb;
+        Eigen::RowVectorXd mean;
+        Eigen::MatrixXd cov;
+        double doublePi = M_PI * 2.0;
+
+        for (int i=0; i<gmm.size(); i++)
+        {
+
+                mean = gmm[i].get<3>();
+                cov = gmm[i].get<4>();
+                double err = (-1/2)*(observation-mean).transpose()*cov.inverse()*(observation-mean);
+
+                modelProb = (1/(sqrt(doublePi*cov.determinant()))) * (exp(err));
+                if (modelProb > maxProb)
+                {
+                        maxProb = modelProb;
+                        idx = i;
+                }
+        }
+
+        merge::mixtureComponents gmmComp = gmm[idx];
+        merge::observationModel obsModel = boost::make_tuple(gmmComp, maxProb);
+
+        return obsModel;
+}

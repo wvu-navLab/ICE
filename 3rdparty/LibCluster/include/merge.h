@@ -3,6 +3,8 @@
 
 #include <vector>
 #include <stdexcept>
+#include <cmath>
+#define _USE_MATH_DEFINES
 
 #include <Eigen/Dense>
 
@@ -36,6 +38,7 @@ namespace merge
 
 // Total num. obs, Num obs in comp., comp. weight, compt. mean, compt. cov.
 typedef boost::tuple<int, int, double, Eigen::RowVectorXd, Eigen::MatrixXd> mixtureComponents;
+typedef boost::tuple<mixtureComponents, double> observationModel;
 
 // Implementation of Chi-square check for covarianec matrices.
 bool checkCov(Eigen::MatrixXd data, Eigen::MatrixXd qZ, mixtureComponents priorModel, GaussWish currModel, double currWeight, int currModelIdx, double alpha);
@@ -57,6 +60,9 @@ bool checkComponent(Eigen::MatrixXd data, Eigen::MatrixXd qZ, mixtureComponents 
 
 // Implementaion of Algo. 1  in [1] to merge statistically equlivant components of a mixture model.
 vector<mixtureComponents> mergeMixtureModel(Eigen::MatrixXd data, Eigen::MatrixXd qZ, vector<mixtureComponents> priorModel, vector<GaussWish> currModel, StickBreak currWeight, double alpha, int truncLevel);
+
+// Return the highest probability mixture component given an observation
+observationModel getMixtureComponent(vector<mixtureComponents> gmm, Eigen::VectorXd observation);
 
 }
 
