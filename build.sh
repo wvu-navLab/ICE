@@ -24,17 +24,6 @@ make install -s -j $NCORES
 
 ln -s "$DIR/include/eigen3" "$DIR/include/Eigen"
 
-# Setup GTSAM
-if [ -d "$DIR/3rdparty/RobustGNSS/gtsam/build" ]
-then
-  rm -rf "$DIR/3rdparty/RobustGNSS/gtsam/build"
-fi
-mkdir "$DIR/3rdparty/RobustGNSS/gtsam/build"
-cd "$DIR/3rdparty/RobustGNSS/gtsam/build"
-cmake -DGTSAM_USE_SYSTEM_EIGEN="ON" -DGTSAM_EIGEN_INCLUDE_PREFIX="$DIR/include/Eigen/" -DCMAKE_INSTALL_PREFIX="$DIR" ..
-make -s -j $NCORES
-make install
-
 
 # Setup LibCluster
 if [ -d "$DIR/3rdparty/LibCluster/build" ]
@@ -44,6 +33,19 @@ fi
 mkdir "$DIR/3rdparty/LibCluster/build"
 cd "$DIR/3rdparty/LibCluster/build"
 cmake -DCMAKE_INSTALL_PREFIX="$DIR/" -DEIGEN_INCLUDE_DIRS="$DIR/include/Eigen/" ..
+make -s -j $NCORES
+make install
+
+
+
+# Setup GTSAM
+if [ -d "$DIR/3rdparty/RobustGNSS/gtsam/build" ]
+then
+  rm -rf "$DIR/3rdparty/RobustGNSS/gtsam/build"
+fi
+mkdir "$DIR/3rdparty/RobustGNSS/gtsam/build"
+cd "$DIR/3rdparty/RobustGNSS/gtsam/build"
+cmake -DGTSAM_USE_SYSTEM_EIGEN="ON" -DGTSAM_EIGEN_INCLUDE_PREFIX="$DIR/include/Eigen/" -DCMAKE_INSTALL_PREFIX="$DIR" ..
 make -s -j $NCORES
 make install
 

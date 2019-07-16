@@ -126,12 +126,13 @@ vector<faultyRnxData> readGNSSFaulty(const std::string &fileLoc, const double &m
                            { epoch, svn, satXYZ, computed_range, rangeLC, phaseLC }
          */
         vector<faultyRnxData> data;
-        string data_file = findExampleDataFile(fileLoc);
-        ifstream is(data_file.c_str());
+        // string data_file = findExampleDataFile(fileLoc);
+        // ifstream is(data_file.c_str());
+        ifstream is(fileLoc.c_str());
 
         std::default_random_engine generator;
         std::normal_distribution<double> dist1(mean, stdDev);
-        std::normal_distribution<double> dist2(mean, stdDev/100);
+        std::normal_distribution<double> dist2(mean/10.0, stdDev/10.0);
 
         double rangeMag, phaseMag;
 

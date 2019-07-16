@@ -59,7 +59,7 @@ bool merge::checkCov(Eigen::MatrixXd data, Eigen::MatrixXd qZ, mixtureComponents
         chol_inv = chol.inverse();
 
         int n = currModel.getN() + 1;
-        int d = (currModel.getmean()).size()+1;
+        int d = (currModel.getmean()).size() + 1;
 
         chi_squared dist((d*(d+1))/2);
         double ucv = quantile(complement(dist, alpha));

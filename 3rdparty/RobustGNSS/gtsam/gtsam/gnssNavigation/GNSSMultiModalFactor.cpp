@@ -8,6 +8,7 @@
 
 using namespace std;
 using namespace boost;
+using namespace merge;
 
 namespace gtsam {
 //***************************************************************************
@@ -44,9 +45,11 @@ Vector GNSSMultiModalFactor::evaluateError(const nonBiasStates& q, const phaseBi
 
         noiseModel::Diagonal::shared_ptr newModel = noiseModel::Diagonal::Sigmas((gtsam::Vector(2) << cov(0,0), cov(1,1)).finished());
 
-        *this->noiseModel_ = *newModel;
+        SharedDiagonal sharedDiag = boost::dynamic_pointer_cast<
+                noiseModel::Diagonal>(newModel);
 
-        // return (Vector(2) << res_range, res_phase).finished();
+        *this->noiseModel_ = *sharedDiag;
+
         return (Vector(2) << res_range - mean(0), res_phase - mean(1)).finished();
 }
 
