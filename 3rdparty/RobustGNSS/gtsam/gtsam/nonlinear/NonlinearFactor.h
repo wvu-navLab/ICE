@@ -152,9 +152,12 @@ shared_ptr rekey(const std::vector<Key>& new_keys) const;
 
 }; // \class NonlinearFactor
 
+
 /// traits
 template<> struct traits<NonlinearFactor> : public Testable<NonlinearFactor> {
 };
+
+
 
 /* ************************************************************************* */
 /**
@@ -175,7 +178,7 @@ protected:
 typedef NonlinearFactor Base;
 typedef NoiseModelFactor This;
 
-SharedNoiseModel noiseModel_;   /** Noise model */
+mutable SharedNoiseModel noiseModel_;   /** Noise model */
 
 public:
 
@@ -222,6 +225,11 @@ virtual size_t dim() const {
 /// access to the noise model
 const SharedNoiseModel& noiseModel() const {
         return noiseModel_;
+}
+
+/// access to the noise model
+void updateCov(const SharedNoiseModel& noiseModel) const {
+        *this->noiseModel_ = *noiseModel;
 }
 
 /// @deprecated access to the noise model

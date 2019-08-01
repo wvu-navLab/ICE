@@ -132,7 +132,7 @@ vector<faultyRnxData> readGNSSFaulty(const std::string &fileLoc, const double &m
 
         std::default_random_engine generator;
         std::normal_distribution<double> dist1(mean, stdDev);
-        std::normal_distribution<double> dist2(mean/10.0, stdDev/10.0);
+        std::normal_distribution<double> dist2(mean, stdDev/10.0);
 
         double rangeMag, phaseMag;
 

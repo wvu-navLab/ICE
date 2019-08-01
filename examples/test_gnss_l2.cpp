@@ -68,8 +68,8 @@ int main(int argc, char* argv[])
         // define std out print color
         vector<int> prn_vec;
         vector<int> factor_count_vec;
-        vector<rnxData> data;
-        // vector<faultyRnxData> data;
+        // vector<rnxData> data;
+        vector<faultyRnxData> data;
         const string red("\033[0;31m");
         const string green("\033[0;32m");
         string confFile, gnssFile, station;
@@ -114,19 +114,19 @@ int main(int argc, char* argv[])
         Point3 nomXYZ(xn, yn, zn);
         Point3 prop_xyz = nomXYZ;
 
-        try {data = readGNSS_SingleFreq(gnssFile); }
-        catch(std::exception& e)
-        {
-                cout << red << "\n\n Cannot read GNSS data file " << endl;
-                exit(1);
-        }
-
-        // try { data = readGNSSFaulty(gnssFile, 50.0, 25.0, 0.4); }
+        // try {data = readGNSS_SingleFreq(gnssFile); }
         // catch(std::exception& e)
         // {
         //         cout << red << "\n\n Cannot read GNSS data file " << endl;
         //         exit(1);
         // }
+
+        try { data = readGNSSFaulty(gnssFile, 50.0, 10.0, 0.0); }
+        catch(std::exception& e)
+        {
+                cout << red << "\n\n Cannot read GNSS data file " << endl;
+                exit(1);
+        }
 
         #ifdef GTSAM_USE_TBB
         std::auto_ptr<tbb::task_scheduler_init> init;

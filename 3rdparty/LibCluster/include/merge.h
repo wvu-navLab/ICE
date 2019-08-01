@@ -42,9 +42,12 @@ typedef boost::tuple<mixtureComponents, double> observationModel;
 
 // Implementation of Chi-square check for covarianec matrices.
 bool checkCov(Eigen::MatrixXd data, Eigen::MatrixXd qZ, mixtureComponents priorModel, GaussWish currModel, double currWeight, int currModelIdx, double alpha);
+bool checkCovGMM(mixtureComponents prior, mixtureComponents test, double alpha);
+
 
 // Implementation of Fisher-Dist. check for mean vectors
-bool checkMean(mixtureComponents priorModel, GaussWish currModel, double currWeight, double alpha);
+bool checkMean(mixtureComponents priorModel, GaussWish currModel, double alpha);
+bool checkMeanGMM(mixtureComponents priorModel, mixtureComponents currModel, double alpha);
 
 // get weight vector from prior model
 vector<double> getPriorWeights(vector<mixtureComponents> gmm);
@@ -57,6 +60,7 @@ bool sortbyobs(mixtureComponents a, mixtureComponents b);
 // Check cov. and mean to see if components are approx. equlivant.
 bool checkComponent(Eigen::MatrixXd data, Eigen::MatrixXd qZ, mixtureComponents priorModel, GaussWish currModel, double currWeight, int currModelIdx, double alpha);
 
+bool checkComponentGMM(mixtureComponents prior, mixtureComponents test, double alpha);
 
 // Implementaion of Algo. 1  in [1] to merge statistically equlivant components of a mixture model.
 vector<mixtureComponents> mergeMixtureModel(Eigen::MatrixXd data, Eigen::MatrixXd qZ, vector<mixtureComponents> priorModel, vector<GaussWish> currModel, StickBreak currWeight, double alpha, int truncLevel);

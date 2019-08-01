@@ -68,8 +68,8 @@ int main(int argc, char* argv[])
         // define std out print color
         vector<int> prn_vec;
         vector<int> factor_count_vec;
-        vector<rnxData> data;
-        // vector<faultyRnxData> data;
+        // vector<rnxData> data;
+        vector<faultyRnxData> data;
         const string red("\033[0;31m");
         const string green("\033[0;32m");
         string confFile, gnssFile, station;
@@ -115,21 +115,21 @@ int main(int argc, char* argv[])
         Point3 nomXYZ(xn, yn, zn);
         Point3 prop_xyz = nomXYZ;
 
-        // try { data = readGNSSFaulty(gnssFile, 50.0, 5.0, 0.4); }
-        // catch(std::exception& e)
-        // {
-        //         cout << red << "\n\n Cannot read GNSS data file " << endl;
-        //         exit(1);
-        // }
-
-
-        try {data = readGNSS_SingleFreq(gnssFile); }
+        try { data = readGNSSFaulty(gnssFile, 50.0, 10.0, 0.2); }
         catch(std::exception& e)
         {
                 cout << red << "\n\n Cannot read GNSS data file " << endl;
                 exit(1);
         }
 
+
+        // try {data = readGNSS_SingleFreq(gnssFile); }
+        // catch(std::exception& e)
+        // {
+        //         cout << red << "\n\n Cannot read GNSS data file " << endl;
+        //         exit(1);
+        // }
+        //
 
         #ifdef GTSAM_USE_TBB
         std::auto_ptr<tbb::task_scheduler_init> init;
@@ -149,8 +149,8 @@ int main(int argc, char* argv[])
 
         ISAM2DoglegParams doglegParams;
         ISAM2Params parameters;
-        parameters.relinearizeThreshold = 0.001;
-        parameters.relinearizeSkip = 1;
+        parameters.relinearizeThreshold = 1.0;
+        parameters.relinearizeSkip = 500;
         ISAM2 isam(parameters);
 
         double output_time = 0.0;
@@ -184,10 +184,10 @@ int main(int argc, char* argv[])
         // noiseModel::Diagonal::shared_ptr nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.1, 0.1, 0.1, 3e6, 3e-5).finished());
         //
         // noiseModel::Diagonal::shared_ptr initNoise = noiseModel::Diagonal::Variances((gtsam::Vector(1) << 100).finished());
-        //
+
         NonlinearFactorGraph *graph = new NonlinearFactorGraph();
 
-        residuals.setZero(1000,2);
+        residuals.setZero(2500,2);
 
         // init. mixture model.
         // Init this from file later
@@ -279,7 +279,7 @@ int main(int argc, char* argv[])
                         // Get residuals from graph
                         for (int i = 0; i<factor_count_vec.size(); i++) {
                                 ++res_count;
-                                if (res_count > 999 )
+                                if (res_count > 2499 )
                                 {
                                         residuals.conservativeResize(residuals.rows()+1, residuals.cols());
 
@@ -294,7 +294,7 @@ int main(int argc, char* argv[])
                         factor_count = -1;
 
 
-                        if (res_count >= 1000)
+                        if (res_count >= 2500)
                         {
                                 StickBreak weights;
                                 vector<GaussWish> clusters;
@@ -302,7 +302,7 @@ int main(int argc, char* argv[])
 
                                 learnVDP(residuals, qZ, weights, clusters);
 
-                                globalMixtureModel = mergeMixtureModel(residuals, qZ, globalMixtureModel, clusters, weights, 0.05, 10);
+                                globalMixtureModel = mergeMixtureModel(residuals, qZ, globalMixtureModel, clusters, weights, 0.02, 15);
 
                                 // cout << "\n\n\n\n\n\n" << endl;
                                 // cout << "----------------- Merged MODEL ----------------" << endl;
@@ -313,7 +313,7 @@ int main(int argc, char* argv[])
                                 //         cout << mc.get<0>() << " " << mc.get<1>() << " "  <<  mc.get<2>() << "    " << mc.get<3>() <<"     "<< cov(0,0) << " " << cov(0,1) << " " << cov(1,1) <<"     "<<"\n\n" << endl;
                                 // }
 
-                                residuals.setZero(1000,2);
+                                residuals.setZero(2500,2);
                                 res_count = -1;
                         }
 

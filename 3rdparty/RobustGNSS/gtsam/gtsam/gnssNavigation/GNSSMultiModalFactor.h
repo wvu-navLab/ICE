@@ -1,6 +1,6 @@
 /**
  *  @file   GNSSMultiModalFactor.h
- *  @author Ryan Watson & Jason Gross
+ *  @author Ryan Watson
  *  @brief  Header file for GNSS Factor with multimodal uncert. model
  **/
 
@@ -11,9 +11,11 @@
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/geometry/Point2.h>
 #include <gtsam/geometry/Point3.h>
+#include <gtsam/linear/GaussianFactor.h>
 #include <gtsam/gnssNavigation/GnssTools.h>
 #include <gtsam/nonlinear/NonlinearFactor.h>
 #include <gtsam/gnssNavigation/nonBiasStates.h>
+
 
 #include <libcluster/merge.h>
 #include <libcluster/probutils.h>
@@ -27,45 +29,51 @@
 namespace gtsam {
 
 
-class GTSAM_EXPORT GNSSMultiModalFactor : public NoiseModelFactor2<nonBiasStates, phaseBias> {
+class GTSAM_EXPORT GNSSMultiModalFactor : public NonlinearFactor {
 
 private:
-typedef NoiseModelFactor2<nonBiasStates, phaseBias> Base;
+
+typedef gtsam::NonlinearFactor Base;
+typedef GNSSMultiModalFactor This;
+
+Key k1_,k2_;
 Point3 satXYZ_;
 Point3 nomXYZ_;
-Vector2 measured_;
 nonBiasStates h_;
+Vector2 measured_;
 vector<merge::mixtureComponents> gmm_;
+noiseModel::Diagonal::shared_ptr cov_hyp_;
 
 public:
 
 typedef boost::shared_ptr<GNSSMultiModalFactor> shared_ptr;
-typedef GNSSMultiModalFactor This;
 
 GNSSMultiModalFactor() : measured_() {
         h_=Matrix(2,5);
 }
 
+GNSSMultiModalFactor(Key deltaStates, Key bias, const Vector2 measurement,
+                     const Point3 satXYZ, const Point3 nomXYZ, const SharedDiagonal &model, vector<merge::mixtureComponents> gmm) :
+        Base(cref_list_of<2>(deltaStates)(bias)), k1_(deltaStates), k2_(bias), measured_(measurement), satXYZ_(satXYZ), nomXYZ_(nomXYZ), gmm_(gmm), cov_hyp_(model) {
+}
+
 virtual ~GNSSMultiModalFactor() {
 }
-
-GNSSMultiModalFactor(Key deltaStates, Key bias, const Vector2 measurement,
-                     const Point3 satXYZ, const Point3 nomXYZ,const SharedNoiseModel &model, vector<merge::mixtureComponents> gmm) :
-        Base(model, deltaStates, bias), measured_(measurement)
-{
-        satXYZ_=satXYZ;
-        nomXYZ_=nomXYZ;
-        gmm_ = gmm;
-}
-
 
 /** print */
 virtual void print(const std::string& s, const KeyFormatter& keyFormatter = DefaultKeyFormatter) const {
         std::cout << s << "GNSS Factor("
-                  << keyFormatter(this->key1()) << ","
-                  << keyFormatter(this->key2()) << ")\n"
+                  << keyFormatter(k1_) << ","
+                  << keyFormatter(k2_) << ")\n"
                   << "  measured:  " << measured_.transpose() << "\n"
-                  << " noise model: "; this->noiseModel_->print("  noise model: ");
+                  << " noise model: "; cov_hyp_->print("  noise model: ");
+}
+
+virtual bool equals(const NonlinearFactor& f, double tol = 1e-9) const {
+        const This *t = dynamic_cast<const This*>(&f);
+
+        if (t && Base::equals(f)) { return k1_ == t->k1_ && k2_ == t->k2_; }
+        else{ return false; }
 }
 
 virtual gtsam::NonlinearFactor::shared_ptr clone() const {
@@ -73,18 +81,93 @@ virtual gtsam::NonlinearFactor::shared_ptr clone() const {
                        gtsam::NonlinearFactor::shared_ptr(new GNSSMultiModalFactor(*this)));
 }
 
-Vector evaluateError(const nonBiasStates& q, const phaseBias& g,
-                     boost::optional<Matrix&> H1 = boost::none,
-                     boost::optional<Matrix&> H2 = boost::none ) const;
+virtual double error(const gtsam::Values& x) const {
+        return whitenedError(x).squaredNorm();
+}
+
+Vector unwhitenedError(const gtsam::Values& x,
+                       boost::optional<std::vector<Matrix>&> H = boost::none) const;
+
+Vector whitenedError(const gtsam::Values& x,
+                     boost::optional<std::vector<Matrix>&> H = boost::none) const;
+
+virtual Vector residual(const gtsam::Values& x) const {
+        const Vector b = unwhitenedError(x);
+        return b;
+}
+
+virtual size_t dim() const {
+        return 2;
+}
+
+std::size_t size() const {
+        return 2;
+}
+
+bool active(const gtsam::Values& x) const {
+        return true;
+}
+
+
+
+/* ************************************************************************* */
+/**
+ * Linearize a non-linearFactorN to get a gtsam::GaussianFactor,
+ * \f$ Ax-b \approx h(x+\delta x)-z = h(x) + A \delta x - z \f$
+ * Hence \f$ b = z - h(x) = - \mathtt{error\_vector}(x) \f$
+ */
+/* This version of linearize recalculates the noise model each time */
+virtual boost::shared_ptr<gtsam::GaussianFactor> linearize(
+        const gtsam::Values& x) const {
+
+        if (!active(x))
+                return boost::shared_ptr<JacobianFactor>();
+
+        // Call evaluate error to get Jacobians and RHS vector b
+        std::vector<Matrix> A(this->size());
+        Vector b = -unwhitenedError(x, A);
+
+        // Fill in terms, needed to create JacobianFactor below
+        std::vector<std::pair<Key, Matrix> > terms(size());
+        for (size_t j = 0; j < size(); ++j) {
+                terms[j].first = keys()[j];
+                terms[j].second.swap(A[j]);
+        }
+
+        double e, eMin;
+        eMin = 1e100;
+        int ind(0);
+        gtsam::Matrix cov_min;
+        for (int i=0; i<gmm_.size(); i++)
+        {
+                merge::mixtureComponents mixtureComp = gmm_[i];
+                Eigen::MatrixXd cov = mixtureComp.get<4>();
+                gtsam::Matrix c(2,2);
+                c << cov(0,0), cov(0,1), cov(1,0), cov(1,1);
+                e = ((gtsam::noiseModel::Gaussian::Covariance(c))->whiten(-b)).squaredNorm();
+
+                if (e < eMin)
+                {
+                        ind = i;
+                        eMin = e;
+                        cov_min = c;
+                }
+
+        }
+
+        return GaussianFactor::shared_ptr(
+                       new JacobianFactor(terms, b, noiseModel::Diagonal::Variances((gtsam::Vector(2) << cov_min(0,0), cov_min(1,1)).finished()) ));
+}
+
 
 private:
 
-/// Serialization function
+/** Serialization function */
 friend class boost::serialization::access;
 template<class ARCHIVE>
 void serialize(ARCHIVE & ar, const unsigned int /*version*/) {
         ar
-        & boost::serialization::make_nvp("NoiseModelFactor2",
+        & boost::serialization::make_nvp("NonlinearFactor",
                                          boost::serialization::base_object<Base>(*this));
         ar & BOOST_SERIALIZATION_NVP(measured_);
 }
