@@ -68,8 +68,8 @@ int main(int argc, char* argv[])
         // define std out print color
         vector<int> prn_vec;
         vector<int> factor_count_vec;
-        // vector<rnxData> data;
-        vector<faultyRnxData> data;
+        vector<rnxData> data;
+        // vector<faultyRnxData> data;
         const string red("\033[0;31m");
         const string green("\033[0;32m");
         string confFile, gnssFile, station;
@@ -78,7 +78,6 @@ int main(int argc, char* argv[])
         int nThreads(-1), phase_break, break_count(0), nextKey, factor_count(-1), res_count(-1);
         bool printECEF, printENU, printAmb, first_ob(true);
         Eigen::MatrixXd residuals;
-
 
         cout.precision(12);
 
@@ -114,19 +113,19 @@ int main(int argc, char* argv[])
         Point3 nomXYZ(xn, yn, zn);
         Point3 prop_xyz = nomXYZ;
 
-        // try {data = readGNSS_SingleFreq(gnssFile); }
-        // catch(std::exception& e)
-        // {
-        //         cout << red << "\n\n Cannot read GNSS data file " << endl;
-        //         exit(1);
-        // }
-
-        try { data = readGNSSFaulty(gnssFile, 50.0, 10.0, 0.0); }
+        try {data = readGNSS_SingleFreq(gnssFile); }
         catch(std::exception& e)
         {
                 cout << red << "\n\n Cannot read GNSS data file " << endl;
                 exit(1);
         }
+
+        // try { data = readGNSSFaulty(gnssFile, 50.0, 10.0, 0.3); }
+        // catch(std::exception& e)
+        // {
+        //         cout << red << "\n\n Cannot read GNSS data file " << endl;
+        //         exit(1);
+        // }
 
         #ifdef GTSAM_USE_TBB
         std::auto_ptr<tbb::task_scheduler_init> init;
@@ -230,6 +229,7 @@ int main(int argc, char* argv[])
                                 double scale = (get<0>(data[i+1])-get<0>(data[i]))*10.0;
                                 // initial_values.insert(X(nextKey),initEst);
                                 nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.5*scale, 0.5*scale, 0.5*scale, 1e3*scale, 1e-3*scale).finished());
+                                // nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 5.0*scale, 5.0*scale, 5.0*scale, 1e3*scale, 1e-3*scale).finished());
 
                                 graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-1), initEst, nonBias_ProcessNoise));
                                 ++factor_count;

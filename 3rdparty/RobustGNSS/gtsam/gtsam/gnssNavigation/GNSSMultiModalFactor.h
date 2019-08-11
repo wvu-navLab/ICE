@@ -36,13 +36,13 @@ private:
 typedef gtsam::NonlinearFactor Base;
 typedef GNSSMultiModalFactor This;
 
+mutable int iter_count_;
 Key k1_,k2_;
 Point3 satXYZ_;
 Point3 nomXYZ_;
 nonBiasStates h_;
 Vector2 measured_;
 vector<merge::mixtureComponents> gmm_;
-noiseModel::Diagonal::shared_ptr cov_hyp_;
 
 public:
 
@@ -53,8 +53,8 @@ GNSSMultiModalFactor() : measured_() {
 }
 
 GNSSMultiModalFactor(Key deltaStates, Key bias, const Vector2 measurement,
-                     const Point3 satXYZ, const Point3 nomXYZ, const SharedDiagonal &model, vector<merge::mixtureComponents> gmm) :
-        Base(cref_list_of<2>(deltaStates)(bias)), k1_(deltaStates), k2_(bias), measured_(measurement), satXYZ_(satXYZ), nomXYZ_(nomXYZ), gmm_(gmm), cov_hyp_(model) {
+                     const Point3 satXYZ, const Point3 nomXYZ, vector<merge::mixtureComponents> gmm) :
+        Base(cref_list_of<2>(deltaStates)(bias)), k1_(deltaStates), k2_(bias), measured_(measurement), satXYZ_(satXYZ), nomXYZ_(nomXYZ), gmm_(gmm), iter_count_(0) {
 }
 
 virtual ~GNSSMultiModalFactor() {
@@ -65,8 +65,7 @@ virtual void print(const std::string& s, const KeyFormatter& keyFormatter = Defa
         std::cout << s << "GNSS Factor("
                   << keyFormatter(k1_) << ","
                   << keyFormatter(k2_) << ")\n"
-                  << "  measured:  " << measured_.transpose() << "\n"
-                  << " noise model: "; cov_hyp_->print("  noise model: ");
+                  << "  measured:  " << measured_.transpose();
 }
 
 virtual bool equals(const NonlinearFactor& f, double tol = 1e-9) const {
@@ -97,7 +96,7 @@ virtual Vector residual(const gtsam::Values& x) const {
 }
 
 virtual size_t dim() const {
-        return 2;
+        return 7;
 }
 
 std::size_t size() const {
@@ -119,6 +118,10 @@ bool active(const gtsam::Values& x) const {
 /* This version of linearize recalculates the noise model each time */
 virtual boost::shared_ptr<gtsam::GaussianFactor> linearize(
         const gtsam::Values& x) const {
+
+        iter_count_ += 1;
+
+        // std::cout << "iter " <<  iter_count_ << "for key " << k1_ << std::endl;
 
         if (!active(x))
                 return boost::shared_ptr<JacobianFactor>();
@@ -152,11 +155,11 @@ virtual boost::shared_ptr<gtsam::GaussianFactor> linearize(
                         eMin = e;
                         cov_min = c;
                 }
-
         }
 
-        return GaussianFactor::shared_ptr(
-                       new JacobianFactor(terms, b, noiseModel::Diagonal::Variances((gtsam::Vector(2) << cov_min(0,0), cov_min(1,1)).finished()) ));
+        auto jacobianFactor = GaussianFactor::shared_ptr( new JacobianFactor(terms, b, noiseModel::Diagonal::Variances((gtsam::Vector(2) << cov_min(0,0), cov_min(1,1)).finished()) ));
+
+        return jacobianFactor;
 }
 
 
