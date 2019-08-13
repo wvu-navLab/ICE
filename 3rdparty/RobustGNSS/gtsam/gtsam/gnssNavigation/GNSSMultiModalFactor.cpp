@@ -32,14 +32,17 @@ Vector GNSSMultiModalFactor::whitenedError(const gtsam::Values& x,
         eMin = 1e100;
         int ind(0);
         gtsam::Matrix cov_min;
-        Eigen::RowVectorXd mean_min;
+        Eigen::RowVectorXd mean_min, mean;
+        Eigen::VectorXd res_2(2);
         for (int i=0; i<gmm_.size(); i++)
         {
                 merge::mixtureComponents mixtureComp = gmm_[i];
                 Eigen::MatrixXd cov = mixtureComp.get<4>();
                 gtsam::Matrix c(2,2);
                 c << cov(0,0), cov(0,1), cov(1,0), cov(1,1);
-                e = ((gtsam::noiseModel::Gaussian::Covariance(c))->whiten(res)).squaredNorm();
+                mean = mixtureComp.get<3>();
+                res_2 << res_range - mean(0), res_phase - mean(1);
+                e = ((gtsam::noiseModel::Gaussian::Covariance(c))->whiten(res_2)).squaredNorm();
 
                 if (e < eMin)
                 {
@@ -50,8 +53,6 @@ Vector GNSSMultiModalFactor::whitenedError(const gtsam::Values& x,
                 }
         }
 
-
-        Eigen::VectorXd res_2(2);
         res_2 << res_range - mean_min(0), res_phase - mean_min(1);
 
         if (H) {
@@ -69,17 +70,16 @@ Vector GNSSMultiModalFactor::whitenedError(const gtsam::Values& x,
                 (*H)[0] = H_g;
                 (*H)[1] = H_b;
 
-                if (iter_count_ > 2)
-                {
-                        if (std::abs(res(0)) > 10.0 || std::abs(res(1)) > 0.1)
-                        {
-                                (*H)[0] = H_g*0.0;
-                                (*H)[1] = H_b*0.0;
-
-                        }
-                        return res_2*0.0;
-                }
-
+                // if (iter_count_ > 4)
+                // {
+                //         if (std::abs(res(0)) > 20.0 || std::abs(res(1)) > 0.2)
+                //         {
+                //                 (*H)[0] = H_g*0.0;
+                //                 (*H)[1] = H_b*0.0;
+                //
+                //         }
+                //         return res_2*0.0;
+                // }
         }
 
         return (gtsam::noiseModel::Gaussian::Covariance(cov_min))->whiten(res_2);
@@ -104,14 +104,17 @@ Vector GNSSMultiModalFactor::unwhitenedError(const gtsam::Values& x,
         eMin = 1e100;
         int ind(0);
         gtsam::Matrix cov_min;
-        Eigen::RowVectorXd mean_min;
+        Eigen::RowVectorXd mean_min, mean;
+        Eigen::VectorXd res_2(2);
         for (int i=0; i<gmm_.size(); i++)
         {
                 merge::mixtureComponents mixtureComp = gmm_[i];
                 Eigen::MatrixXd cov = mixtureComp.get<4>();
                 gtsam::Matrix c(2,2);
                 c << cov(0,0), cov(0,1), cov(1,0), cov(1,1);
-                e = ((gtsam::noiseModel::Gaussian::Covariance(c))->whiten(res)).squaredNorm();
+                mean = mixtureComp.get<3>();
+                res_2 << res_range - mean(0), res_phase - mean(1);
+                e = ((gtsam::noiseModel::Gaussian::Covariance(c))->whiten(res_2)).squaredNorm();
 
                 if (e < eMin)
                 {
@@ -122,8 +125,6 @@ Vector GNSSMultiModalFactor::unwhitenedError(const gtsam::Values& x,
                 }
         }
 
-
-        Eigen::VectorXd res_2(2);
         res_2 << res_range - mean_min(0), res_phase - mean_min(1);
 
         if (H) {
@@ -142,16 +143,16 @@ Vector GNSSMultiModalFactor::unwhitenedError(const gtsam::Values& x,
                 (*H)[0] = H_g;
                 (*H)[1] = H_b;
 
-                if (iter_count_ > 2)
-                {
-                        if (std::abs(res(0)) > 10.0 || std::abs(res(1)) > 0.1)
-                        {
-                                (*H)[0] = H_g*0.0;
-                                (*H)[1] = H_b*0.0;
-
-                        }
-                        return res_2*0.0;
-                }
+                // if (iter_count_ > 4)
+                // {
+                //         if (std::abs(res(0)) > 20.0 || std::abs(res(1)) > 0.2)
+                //         {
+                //                 (*H)[0] = H_g*0.0;
+                //                 (*H)[1] = H_b*0.0;
+                //
+                //         }
+                //         return res_2*0.0;
+                // }
         }
 
 

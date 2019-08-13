@@ -148,11 +148,8 @@ int main(int argc, char* argv[])
 
         ISAM2DoglegParams doglegParams;
         ISAM2Params parameters;
-        // parameters.relinearizeThreshold = 0.1;
-        parameters.relinearizeThreshold = 0.05;
-        // parameters.relinearizeSkip = 1000;
-        parameters.relinearizeSkip = 1;
-        // parameters.relinearizeSkip = 10;
+        parameters.relinearizeThreshold = 0.1;
+        parameters.relinearizeSkip = 10;
         ISAM2 isam(parameters);
 
         double output_time = 0.0;
@@ -175,7 +172,7 @@ int main(int argc, char* argv[])
         Values initial_values;
         Values result;
 
-        noiseModel::Diagonal::shared_ptr nonBias_InitNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.5, 0.5, 0.5, 3e6, 1e-1).finished());
+        noiseModel::Diagonal::shared_ptr nonBias_InitNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1.0, 1.0, 1.0, 3e6, 1e-1).finished());
 
         noiseModel::Diagonal::shared_ptr nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.5, 0.5, 0.5, 1e3, 1e-3).finished());
 
@@ -189,7 +186,7 @@ int main(int argc, char* argv[])
 
         NonlinearFactorGraph *graph = new NonlinearFactorGraph();
 
-        residuals.setZero(1000,2);
+        residuals.setZero(2500,2);
 
         // init. mixture model.
         // Init this from file later
@@ -203,7 +200,7 @@ int main(int argc, char* argv[])
 
         //Add comp 2.
         c << rangeWeight*10.0, 0.0, 0.0, phaseWeight*10.0;
-        globalMixtureModel.push_back(boost::make_tuple(0, 0, 0.0, m, c));
+        // globalMixtureModel.push_back(boost::make_tuple(0, 0, 0.0, m, c));
 
         int lastStep = get<0>(data.back());
 
@@ -212,7 +209,8 @@ int main(int argc, char* argv[])
                 double gnssTime = get<0>(data[i]);
                 int currKey = get<1>(data[i]);
                 if (first_ob) {
-                        startKey = currKey; first_ob=false;
+                        first_ob=false;
+                        startKey = currKey;
                         graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
                         ++factor_count;
                         initial_values.insert(X(currKey), initEst);
@@ -239,6 +237,7 @@ int main(int argc, char* argv[])
                 }
 
                 graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
+                // graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, globalMixtureModel));
 
                 prn_vec.push_back(svn);
                 factor_count_vec.push_back(++factor_count);
@@ -247,8 +246,8 @@ int main(int argc, char* argv[])
                         if (currKey > startKey ) {
                                 if ( lastStep == nextKey ) { break; }
                                 double scale = (get<0>(data[i+1])-get<0>(data[i]))*10.0;
-                                // initial_values.insert(X(nextKey),initEst);
-                                nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.5*scale, 0.5*scale, 0.5*scale, 1e3*scale, 1e-3*scale).finished());
+                                nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1.0*scale, 1.0*scale, 1.0*scale, 1e3*scale, 1e-3*scale).finished());
+
                                 graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-1), initEst, nonBias_ProcessNoise));
                                 ++factor_count;
                         }
@@ -282,7 +281,7 @@ int main(int argc, char* argv[])
                         // Get residuals from graph
                         for (int i = 0; i<factor_count_vec.size(); i++) {
                                 ++res_count;
-                                if (res_count > 999 )
+                                if (res_count > 2499 )
                                 {
                                         residuals.conservativeResize(residuals.rows()+1, residuals.cols());
 
@@ -299,7 +298,7 @@ int main(int argc, char* argv[])
 
                         string res_str = "batch_" + to_string(numBatch) + ".residuals";
                         ofstream res_os(res_str);
-                        if (res_count >= 1000)
+                        if (res_count >= 2500)
                         {
                                 ++numBatch;
                                 for (unsigned int i=0; i<residuals.rows()-1; i++)
@@ -315,7 +314,7 @@ int main(int argc, char* argv[])
                                 learnVDP(residuals, qZ, weights, clusters);
 
                                 std::cout << "Trying to Merge" << endl;
-                                globalMixtureModel = mergeMixtureModel(residuals, qZ, globalMixtureModel, clusters, weights, 0.25, 10);
+                                globalMixtureModel = mergeMixtureModel(residuals, qZ, globalMixtureModel, clusters, weights, 0.1, 15);
 
                                 cout << "\n\n\n\n\n\n" << endl;
                                 cout << "----------------- Merged MODEL ----------------" << endl;
@@ -326,7 +325,7 @@ int main(int argc, char* argv[])
                                         cout << mc.get<0>() << " " << mc.get<1>() << " "  <<  mc.get<2>() << "    " << mc.get<3>() <<"     "<< cov(0,0) << " " << cov(0,1) << " " << cov(1,1) <<"     "<<"\n\n" << endl;
                                 }
 
-                                residuals.setZero(1000,2);
+                                residuals.setZero(2500,2);
                                 res_count = -1;
                         }
 
@@ -334,6 +333,9 @@ int main(int argc, char* argv[])
                         initial_values.clear();
                         prn_vec.clear();
                         initial_values.insert(X(nextKey), prior_nonBias);
+                        // initial_values.insert(X(nextKey), initEst);
+                        // graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, nonBias_ProcessNoise));
+                        // ++factor_count;
                 }
 
         }

@@ -96,7 +96,7 @@ virtual Vector residual(const gtsam::Values& x) const {
 }
 
 virtual size_t dim() const {
-        return 7;
+        return 5;
 }
 
 std::size_t size() const {
