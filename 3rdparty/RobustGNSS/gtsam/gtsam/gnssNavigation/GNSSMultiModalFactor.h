@@ -121,8 +121,6 @@ virtual boost::shared_ptr<gtsam::GaussianFactor> linearize(
 
         iter_count_ += 1;
 
-        // std::cout << "iter " <<  iter_count_ << "for key " << k1_ << std::endl;
-
         if (!active(x))
                 return boost::shared_ptr<JacobianFactor>();
 
@@ -137,23 +135,24 @@ virtual boost::shared_ptr<gtsam::GaussianFactor> linearize(
                 terms[j].second.swap(A[j]);
         }
 
-        double e, eMin;
-        eMin = 1e100;
+        double prob, probMax;
+        probMax = 0.0;
         int ind(0);
-        gtsam::Matrix cov_min;
+        gtsam::Matrix cov_min(2,2);
         for (int i=0; i<gmm_.size(); i++)
         {
                 merge::mixtureComponents mixtureComp = gmm_[i];
-                Eigen::MatrixXd cov = mixtureComp.get<4>();
-                gtsam::Matrix c(2,2);
-                c << cov(0,0), cov(0,1), cov(1,0), cov(1,1);
-                e = ((gtsam::noiseModel::Gaussian::Covariance(c))->whiten(-b)).squaredNorm();
 
-                if (e < eMin)
+                SharedGaussian G = gtsam::noiseModel::Gaussian::Covariance(mixtureComp.get<4>());
+                gtsam::Vector errW = G->whiten(-b);
+
+                prob = std::sqrt((mixtureComp.get<4>()).determinant()) * exp(-0.5*errW.dot(errW));
+
+                if (prob >= probMax)
                 {
                         ind = i;
-                        eMin = e;
-                        cov_min = c;
+                        probMax = prob;
+                        cov_min = mixtureComp.get<4>();
                 }
         }
 

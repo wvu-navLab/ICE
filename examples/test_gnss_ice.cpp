@@ -1,7 +1,7 @@
 /*
- * @file pppBayesTree.cpp
+ * @file test_gnss_ice.cpp
  * @brief Iterative GPS Range/Phase Estimator with collected data
- * @author Ryan Watson & Jason Gross
+ * @author Ryan Watson
  */
 
 // GTSAM related includes.
@@ -12,12 +12,8 @@
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/gnssNavigation/GnssData.h>
 #include <gtsam/gnssNavigation/GnssTools.h>
-#include <gtsam/gnssNavigation/GNSSFactor.h>
-#include <gtsam/gnssNavigation/PhaseFactor.h>
 #include <gtsam/gnssNavigation/nonBiasStates.h>
-#include <gtsam/configReader/ConfDataReader.hpp>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
-#include <gtsam/gnssNavigation/PseudorangeFactor.h>
 #include <gtsam/gnssNavigation/GNSSMultiModalFactor.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
 
@@ -35,7 +31,10 @@
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>
 
+// GPSTK
+#include <gpstk/ConfDataReader.hpp>
 
+// STD
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -149,7 +148,7 @@ int main(int argc, char* argv[])
         ISAM2DoglegParams doglegParams;
         ISAM2Params parameters;
         parameters.relinearizeThreshold = 0.1;
-        parameters.relinearizeSkip = 10;
+        parameters.relinearizeSkip = 100;
         ISAM2 isam(parameters);
 
         double output_time = 0.0;
@@ -236,8 +235,8 @@ int main(int argc, char* argv[])
                         ++factor_count;
                 }
 
-                graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
-                // graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, globalMixtureModel));
+                // graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
+                graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, globalMixtureModel));
 
                 prn_vec.push_back(svn);
                 factor_count_vec.push_back(++factor_count);
@@ -246,7 +245,7 @@ int main(int argc, char* argv[])
                         if (currKey > startKey ) {
                                 if ( lastStep == nextKey ) { break; }
                                 double scale = (get<0>(data[i+1])-get<0>(data[i]))*10.0;
-                                nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1.0*scale, 1.0*scale, 1.0*scale, 1e3*scale, 1e-3*scale).finished());
+                                nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.5*scale, 0.5*scale, 0.5*scale, 1e3*scale, 1e-3*scale).finished());
 
                                 graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-1), initEst, nonBias_ProcessNoise));
                                 ++factor_count;

@@ -28,30 +28,34 @@ Vector GNSSMultiModalFactor::whitenedError(const gtsam::Values& x,
         Eigen::VectorXd res(2);
         res << res_range, res_phase;
 
-        double e, eMin;
-        eMin = 1e100;
+        double prob, probMax;
+        probMax = 0.0;
         int ind(0);
-        gtsam::Matrix cov_min;
-        Eigen::RowVectorXd mean_min, mean;
+        gtsam::Matrix cov_min(2,2);
+        Eigen::RowVectorXd mean_min(2);
         Eigen::VectorXd res_2(2);
+
         for (int i=0; i<gmm_.size(); i++)
         {
                 merge::mixtureComponents mixtureComp = gmm_[i];
-                Eigen::MatrixXd cov = mixtureComp.get<4>();
-                gtsam::Matrix c(2,2);
-                c << cov(0,0), cov(0,1), cov(1,0), cov(1,1);
-                mean = mixtureComp.get<3>();
-                res_2 << res_range - mean(0), res_phase - mean(1);
-                e = ((gtsam::noiseModel::Gaussian::Covariance(c))->whiten(res_2)).squaredNorm();
 
-                if (e < eMin)
+                Eigen::RowVectorXd mean = mixtureComp.get<3>();
+                res_2 << res_range - mean(0), res_phase - mean(1);
+
+                SharedGaussian G = gtsam::noiseModel::Gaussian::Covariance(mixtureComp.get<4>());
+                gtsam::Vector errW = G->whiten(res_2);
+
+                prob = std::sqrt((mixtureComp.get<4>()).determinant()) * exp(-0.5*errW.dot(errW));
+
+                if (prob >= probMax)
                 {
                         ind = i;
-                        eMin = e;
-                        cov_min = c;
+                        probMax = prob;
+                        cov_min = mixtureComp.get<4>();
                         mean_min = mixtureComp.get<3>();
                 }
         }
+
 
         res_2 << res_range - mean_min(0), res_phase - mean_min(1);
 
@@ -100,27 +104,30 @@ Vector GNSSMultiModalFactor::unwhitenedError(const gtsam::Values& x,
         Eigen::VectorXd res(2);
         res << res_range, res_phase;
 
-        double e, eMin;
-        eMin = 1e100;
+        double prob, probMax;
+        probMax = 0.0;
         int ind(0);
-        gtsam::Matrix cov_min;
-        Eigen::RowVectorXd mean_min, mean;
+        gtsam::Matrix cov_min(2,2);
+        Eigen::RowVectorXd mean_min(2);
         Eigen::VectorXd res_2(2);
+
         for (int i=0; i<gmm_.size(); i++)
         {
                 merge::mixtureComponents mixtureComp = gmm_[i];
-                Eigen::MatrixXd cov = mixtureComp.get<4>();
-                gtsam::Matrix c(2,2);
-                c << cov(0,0), cov(0,1), cov(1,0), cov(1,1);
-                mean = mixtureComp.get<3>();
-                res_2 << res_range - mean(0), res_phase - mean(1);
-                e = ((gtsam::noiseModel::Gaussian::Covariance(c))->whiten(res_2)).squaredNorm();
 
-                if (e < eMin)
+                Eigen::RowVectorXd mean = mixtureComp.get<3>();
+                res_2 << res_range - mean(0), res_phase - mean(1);
+
+                SharedGaussian G = gtsam::noiseModel::Gaussian::Covariance(mixtureComp.get<4>());
+                gtsam::Vector errW = G->whiten(res_2);
+
+                prob = std::sqrt((mixtureComp.get<4>()).determinant()) * exp(-0.5*errW.dot(errW));
+
+                if (prob >= probMax)
                 {
                         ind = i;
-                        eMin = e;
-                        cov_min = c;
+                        probMax = prob;
+                        cov_min = mixtureComp.get<4>();
                         mean_min = mixtureComp.get<3>();
                 }
         }

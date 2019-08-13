@@ -1,7 +1,7 @@
 /*
- * @file pppBayesTree.cpp
+ * @file test_gnss_l2.cpp
  * @brief Iterative GPS Range/Phase Estimator with collected data
- * @author Ryan Watson & Jason Gross
+ * @author Ryan Watson
  */
 
 // GTSAM related includes.
@@ -13,11 +13,8 @@
 #include <gtsam/gnssNavigation/GnssData.h>
 #include <gtsam/gnssNavigation/GnssTools.h>
 #include <gtsam/gnssNavigation/GNSSFactor.h>
-#include <gtsam/gnssNavigation/PhaseFactor.h>
 #include <gtsam/gnssNavigation/nonBiasStates.h>
-#include <gtsam/configReader/ConfDataReader.hpp>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
-#include <gtsam/gnssNavigation/PseudorangeFactor.h>
 #include <gtsam/gnssNavigation/GNSSMultiModalFactor.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
 
@@ -35,7 +32,10 @@
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>
 
+// GPSTK
+#include <gpstk/ConfDataReader.hpp>
 
+// STD
 #include <chrono>
 #include <fstream>
 #include <iostream>
