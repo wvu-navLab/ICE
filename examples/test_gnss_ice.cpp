@@ -73,7 +73,7 @@ int main(int argc, char* argv[])
         const string green("\033[0;32m");
         string confFile, gnssFile, station;
         double xn, yn, zn, range, phase, rho, gnssTime;
-        int startKey(0), currKey, startEpoch(0), svn, numBatch(0);
+        int startKey(0), currKey, startEpoch(0), svn, numBatch(0), state_count(0);
         int nThreads(-1), phase_break, break_count(0), nextKey, factor_count(-1), res_count(-1);
         bool printECEF, printENU, printAmb, first_ob(true);
         Eigen::MatrixXd residuals;
@@ -147,8 +147,8 @@ int main(int argc, char* argv[])
 
         ISAM2DoglegParams doglegParams;
         ISAM2Params parameters;
-        parameters.relinearizeThreshold = 0.1;
-        parameters.relinearizeSkip = 100;
+        parameters.relinearizeThreshold = 0.01;
+        parameters.relinearizeSkip = 10;
         ISAM2 isam(parameters);
 
         double output_time = 0.0;
@@ -171,7 +171,7 @@ int main(int argc, char* argv[])
         Values initial_values;
         Values result;
 
-        noiseModel::Diagonal::shared_ptr nonBias_InitNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1.0, 1.0, 1.0, 3e6, 1e-1).finished());
+        noiseModel::Diagonal::shared_ptr nonBias_InitNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.2, 0.2, 0.2, 3e6, 1e-1).finished());
 
         noiseModel::Diagonal::shared_ptr nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.5, 0.5, 0.5, 1e3, 1e-3).finished());
 
@@ -235,8 +235,8 @@ int main(int argc, char* argv[])
                         ++factor_count;
                 }
 
-                // graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
-                graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, globalMixtureModel));
+                graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
+                // graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, globalMixtureModel));
 
                 prn_vec.push_back(svn);
                 factor_count_vec.push_back(++factor_count);
@@ -249,6 +249,15 @@ int main(int argc, char* argv[])
 
                                 graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-1), initEst, nonBias_ProcessNoise));
                                 ++factor_count;
+
+                                if (state_count < 500)
+                                {
+                                        ++state_count;
+                                        graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
+
+                                        ++factor_count;
+                                }
+
                         }
                         isam.update(*graph, initial_values);
                         isam.update();
