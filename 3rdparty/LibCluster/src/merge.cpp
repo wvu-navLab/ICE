@@ -71,9 +71,10 @@ bool merge::checkCov(Eigen::MatrixXd data, Eigen::MatrixXd qZ, mixtureComponents
         transObs.setZero(tmp.rows(),d);
         for (int k = 0; k < tmp.rows(); k++)
         {
-                transObs.row(k) = chol_inv * tmp.row(k); // data.row(mapidx[k]);
+                transObs.row(k) = chol_inv * tmp.row(k);
         }
 
+        if (transObs.rows() < 3) {return false; }
         auto transCov = probutils::cov(transObs);
         auto covDiff = transCov - Eigen::MatrixXd::Identity(d,d);
         auto covDiff_sq = covDiff * covDiff;
@@ -206,7 +207,6 @@ vector<merge::mixtureComponents> merge::pruneMixtureModel(vector<merge::mixtureC
         if (gmm.size() < truncLevel)
                 return gmm;
 
-
         merge::mixtureComponents currComponent;
         sort(gmm.begin(), gmm.end(), sortbyobs);
         while (gmm.size() > truncLevel)
@@ -222,7 +222,6 @@ vector<merge::mixtureComponents> merge::pruneMixtureModel(vector<merge::mixtureC
                 }
                 gmm.erase(gmm.begin());
         }
-
 
         return gmm;
 }
@@ -250,15 +249,26 @@ vector<merge::mixtureComponents> merge::mergeMixtureModel(Eigen::MatrixXd data, 
                         auto m = j->getmean();
                         // cluster cov
                         auto c = j->getcov();
-
+                        // add new component to mixture model
                         gmm.push_back(boost::make_tuple(dataCard, n, w, m, c));
                         cc+=1;
                 }
                 return gmm;
         }
 
+        // remove cluster without sufficient obs.
+        int m_inc = 0;
+        for (vector<GaussWish>::iterator j = currModel.begin(); j < currModel.end(); ++j)
+        {
+                if (j->getN() < 2.0) {
+                        currModel.erase(currModel.begin() + m_inc);
+                }
+                m_inc++;
+        }
+
         for (unsigned int i=0; i<priorModel.size(); i++)
         {
+
                 for (vector<GaussWish>::iterator j = currModel.begin(); j < currModel.end(); ++j)
                 {
                         if( checkComponent(data, qZ, priorModel[i], *j, cWeights[cc], cc, alpha)
@@ -353,7 +363,7 @@ vector<merge::mixtureComponents> merge::mergeMixtureModel(Eigen::MatrixXd data, 
         {
                 for (unsigned int j=0; j<gmm.size(); j++)
                 {
-                        if (i==j) {break; }
+                        if (i==j) {continue; }
                         if (checkComponentGMM(gmm[i], gmm[j], alpha))
                         {
 

@@ -45,7 +45,13 @@ Vector GNSSMultiModalFactor::whitenedError(const gtsam::Values& x,
                 SharedGaussian G = gtsam::noiseModel::Gaussian::Covariance(mixtureComp.get<4>());
                 gtsam::Vector errW = G->whiten(res_2);
 
-                prob = std::sqrt((mixtureComp.get<4>()).determinant()) * exp(-0.5*errW.dot(errW));
+                double quadform  = (res_2).transpose() * (mixtureComp.get<4>()).inverse() * (res_2);
+                double norm = std::pow(std::sqrt(2 * M_PI),-1) * std::pow((mixtureComp.get<4>()).determinant(), -0.5);
+
+                prob =  norm * exp(-0.5 * quadform);
+
+
+                // prob = std::sqrt((mixtureComp.get<4>()).determinant()) * exp(-0.5*errW.dot(errW));
 
                 if (prob >= probMax)
                 {
@@ -76,13 +82,13 @@ Vector GNSSMultiModalFactor::whitenedError(const gtsam::Values& x,
 
                 // if (iter_count_ > 4)
                 // {
-                //         if (std::abs(res(0)) > 20.0 || std::abs(res(1)) > 0.2)
+                //         if (std::abs(res(0)) > 25.0 || std::abs(res(1)) > 0.5)
                 //         {
                 //                 (*H)[0] = H_g*0.0;
                 //                 (*H)[1] = H_b*0.0;
                 //
                 //         }
-                //         return res_2*0.0;
+                // return (gtsam::noiseModel::Gaussian::Covariance(cov_min))->whiten(res_2);
                 // }
         }
 
@@ -121,7 +127,13 @@ Vector GNSSMultiModalFactor::unwhitenedError(const gtsam::Values& x,
                 SharedGaussian G = gtsam::noiseModel::Gaussian::Covariance(mixtureComp.get<4>());
                 gtsam::Vector errW = G->whiten(res_2);
 
-                prob = std::sqrt((mixtureComp.get<4>()).determinant()) * exp(-0.5*errW.dot(errW));
+                double quadform  = (res_2).transpose() * (mixtureComp.get<4>()).inverse() * (res_2);
+                double norm = std::pow(std::sqrt(2 * M_PI),-1) * std::pow((mixtureComp.get<4>()).determinant(), -0.5);
+
+                prob =  norm * exp(-0.5 * quadform);
+
+
+                // prob = 1.0 / std::sqrt((mixtureComp.get<4>()).determinant()) * exp(-0.5*errW.dot(errW));
 
                 if (prob >= probMax)
                 {
@@ -152,13 +164,13 @@ Vector GNSSMultiModalFactor::unwhitenedError(const gtsam::Values& x,
 
                 // if (iter_count_ > 4)
                 // {
-                //         if (std::abs(res(0)) > 20.0 || std::abs(res(1)) > 0.2)
+                //         if (std::abs(res(0)) > 25.0 || std::abs(res(1)) > 0.5)
                 //         {
                 //                 (*H)[0] = H_g*0.0;
                 //                 (*H)[1] = H_b*0.0;
                 //
                 //         }
-                //         return res_2*0.0;
+                //         return res_2;
                 // }
         }
 

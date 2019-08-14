@@ -146,7 +146,14 @@ virtual boost::shared_ptr<gtsam::GaussianFactor> linearize(
                 SharedGaussian G = gtsam::noiseModel::Gaussian::Covariance(mixtureComp.get<4>());
                 gtsam::Vector errW = G->whiten(b);
 
-                prob = std::sqrt((mixtureComp.get<4>()).determinant()) * exp(-0.5*errW.dot(errW));
+                double quadform  = (b).transpose() * (mixtureComp.get<4>()).inverse() * (b);
+                double norm = std::pow(std::sqrt(2 * M_PI),-1) * std::pow((mixtureComp.get<4>()).determinant(), -0.5);
+
+                prob =  norm * exp(-0.5 * quadform);
+
+                // prob = std::sqrt((mixtureComp.get<4>()).determinant()) * exp(-0.5*errW.dot(errW));
+
+                // std::cout << "Error of " << errW.transpose() << " with prob of " << prob << std::endl;
 
                 if (prob >= probMax)
                 {
@@ -156,7 +163,9 @@ virtual boost::shared_ptr<gtsam::GaussianFactor> linearize(
                 }
         }
 
-        auto jacobianFactor = GaussianFactor::shared_ptr( new JacobianFactor(terms, b, noiseModel::Diagonal::Variances((gtsam::Vector(2) << cov_min(0,0), cov_min(1,1)).finished()) ));
+        // std::cout << "The Max prob is " << probMax << std::endl;
+
+        auto jacobianFactor = GaussianFactor::shared_ptr( new JacobianFactor(terms, -b, noiseModel::Diagonal::Variances((gtsam::Vector(2) << cov_min(0,0), cov_min(1,1)).finished()) ));
 
         return jacobianFactor;
 }
