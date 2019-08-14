@@ -126,7 +126,7 @@ virtual boost::shared_ptr<gtsam::GaussianFactor> linearize(
 
         // Call evaluate error to get Jacobians and RHS vector b
         std::vector<Matrix> A(this->size());
-        Vector b = -unwhitenedError(x, A);
+        Vector b = unwhitenedError(x, A);
 
         // Fill in terms, needed to create JacobianFactor below
         std::vector<std::pair<Key, Matrix> > terms(size());
@@ -144,7 +144,7 @@ virtual boost::shared_ptr<gtsam::GaussianFactor> linearize(
                 merge::mixtureComponents mixtureComp = gmm_[i];
 
                 SharedGaussian G = gtsam::noiseModel::Gaussian::Covariance(mixtureComp.get<4>());
-                gtsam::Vector errW = G->whiten(-b);
+                gtsam::Vector errW = G->whiten(b);
 
                 prob = std::sqrt((mixtureComp.get<4>()).determinant()) * exp(-0.5*errW.dot(errW));
 

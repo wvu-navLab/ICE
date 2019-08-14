@@ -349,55 +349,55 @@ vector<merge::mixtureComponents> merge::mergeMixtureModel(Eigen::MatrixXd data, 
         }
 
         // Merge equilavent components in new GMM
-        // for (unsigned int i=0; i<gmm.size(); i++)
-        // {
-        //         for (unsigned int j=0; j<gmm.size(); j++)
-        //         {
-        //                 if (i==j) {break; }
-        //                 if (checkComponentGMM(gmm[i], gmm[j], alpha))
-        //                 {
-        //
-        //                         int NP = gmm[i].get<0>();
-        //                         int n = gmm[i].get<1>();
-        //                         double WP = gmm[i].get<2>();
-        //                         Eigen::RowVectorXd MP = gmm[i].get<3>();
-        //                         Eigen::MatrixXd CM = gmm[i].get<4>();
-        //                         double NPWP = NP*WP;
-        //
-        //                         int NH = gmm[j].get<0>();
-        //                         int nh = gmm[j].get<1>();
-        //                         double WH = gmm[j].get<2>();
-        //                         Eigen::RowVectorXd MH = gmm[j].get<3>();
-        //                         Eigen::MatrixXd CH = gmm[j].get<4>();
-        //                         double NHWH = NH*WH;
-        //
-        //                         auto denom = NPWP + NHWH;
-        //
-        //                         /// update mean --> REF:: [1] Eq. 6
-        //                         Eigen::RowVectorXd n_mean = (NPWP*MP + NHWH*MH )*(1/denom);
-        //
-        //                         Eigen::MatrixXd A = (NPWP*CM + NHWH*CH)*(1/denom);
-        //
-        //                         Eigen::MatrixXd cov_p = MP.transpose()*MP;
-        //                         Eigen::MatrixXd cov_c = MH.transpose()*MH;
-        //
-        //                         Eigen::MatrixXd B = ( NPWP*cov_p + NHWH*cov_c )*(1/denom);
-        //
-        //                         Eigen::MatrixXd C = n_mean.transpose() * n_mean;
-        //
-        //
-        //                         gmm[i].get<1>() = (n + nh);
-        //                         gmm[i].get<2>() = gmm[i].get<1>()/(double) (NP);
-        //                         gmm[i].get<3>() = n_mean;
-        //                         /// update cov --> REF:: [1] Eq. 7
-        //                         gmm[i].get<4>() = A + B - C;
-        //
-        //                         // remove merged component from global GMM
-        //                         gmm.erase(gmm.begin() + j);
-        //                 }
-        //         }
-        //
-        // }
+        for (unsigned int i=0; i<gmm.size(); i++)
+        {
+                for (unsigned int j=0; j<gmm.size(); j++)
+                {
+                        if (i==j) {break; }
+                        if (checkComponentGMM(gmm[i], gmm[j], alpha))
+                        {
+
+                                int NP = gmm[i].get<0>();
+                                int n = gmm[i].get<1>();
+                                double WP = gmm[i].get<2>();
+                                Eigen::RowVectorXd MP = gmm[i].get<3>();
+                                Eigen::MatrixXd CM = gmm[i].get<4>();
+                                double NPWP = NP*WP;
+
+                                int NH = gmm[j].get<0>();
+                                int nh = gmm[j].get<1>();
+                                double WH = gmm[j].get<2>();
+                                Eigen::RowVectorXd MH = gmm[j].get<3>();
+                                Eigen::MatrixXd CH = gmm[j].get<4>();
+                                double NHWH = NH*WH;
+
+                                auto denom = NPWP + NHWH;
+
+                                /// update mean --> REF:: [1] Eq. 6
+                                Eigen::RowVectorXd n_mean = (NPWP*MP + NHWH*MH )*(1/denom);
+
+                                Eigen::MatrixXd A = (NPWP*CM + NHWH*CH)*(1/denom);
+
+                                Eigen::MatrixXd cov_p = MP.transpose()*MP;
+                                Eigen::MatrixXd cov_c = MH.transpose()*MH;
+
+                                Eigen::MatrixXd B = ( NPWP*cov_p + NHWH*cov_c )*(1/denom);
+
+                                Eigen::MatrixXd C = n_mean.transpose() * n_mean;
+
+
+                                gmm[i].get<1>() = (n + nh);
+                                gmm[i].get<2>() = gmm[i].get<1>()/(double) (NP);
+                                gmm[i].get<3>() = n_mean;
+                                /// update cov --> REF:: [1] Eq. 7
+                                gmm[i].get<4>() = A + B - C;
+
+                                // remove merged component from global GMM
+                                gmm.erase(gmm.begin() + j);
+                        }
+                }
+
+        }
 
         // prune the model to specified truncation level
         gmm = pruneMixtureModel(gmm, truncLevel);

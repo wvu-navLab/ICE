@@ -74,7 +74,7 @@ int main(int argc, char* argv[])
         const string green("\033[0;32m");
         string confFile, gnssFile, station;
         double xn, yn, zn, range, phase, rho, gnssTime;
-        int startKey(0), currKey, startEpoch(0), svn;
+        int startKey(0), currKey, startEpoch(0), svn, state_count(0);
         int nThreads(-1), phase_break, break_count(0), nextKey, factor_count(-1), res_count(-1);
         bool printECEF, printENU, printAmb, first_ob(true);
         Eigen::MatrixXd residuals;
@@ -145,8 +145,8 @@ int main(int argc, char* argv[])
 
         ISAM2DoglegParams doglegParams;
         ISAM2Params parameters;
-        parameters.relinearizeThreshold = 0.1;
-        parameters.relinearizeSkip = 10;
+        parameters.relinearizeThreshold = 0.01;
+        parameters.relinearizeSkip = 1000;
         ISAM2 isam(parameters);
 
         double rangeWeight = pow(2.5,2);
@@ -168,7 +168,7 @@ int main(int argc, char* argv[])
         Values initial_values;
         Values result;
 
-        noiseModel::Diagonal::shared_ptr nonBias_InitNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1.0, 1.0, 1.0, 3e6, 1e-1).finished());
+        noiseModel::Diagonal::shared_ptr nonBias_InitNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.2, 0.2, 0.2, 3e6, 1e-1).finished());
 
         noiseModel::Diagonal::shared_ptr nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.5, 0.5, 0.5, 1e3, 1e-3).finished());
 
@@ -230,10 +230,19 @@ int main(int argc, char* argv[])
                                 if ( lastStep == nextKey ) { break; }
                                 double scale = (get<0>(data[i+1])-get<0>(data[i]))*10.0;
                                 // initial_values.insert(X(nextKey),initEst);
-                                nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1.0*scale, 1.0*scale, 1.0*scale, 1e3*scale, 1e-3*scale).finished());
+                                nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1.5*scale, 1.5*scale, 1.5*scale, 1e3*scale, 1e-3*scale).finished());
 
                                 graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-1), initEst, nonBias_ProcessNoise));
                                 ++factor_count;
+
+                                if (state_count < 1200)
+                                {
+                                        ++state_count;
+                                        graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
+
+                                        ++factor_count;
+                                }
+
                         }
                         isam.update(*graph, initial_values);
                         isam.update();

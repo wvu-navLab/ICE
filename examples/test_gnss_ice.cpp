@@ -148,7 +148,7 @@ int main(int argc, char* argv[])
         ISAM2DoglegParams doglegParams;
         ISAM2Params parameters;
         parameters.relinearizeThreshold = 0.01;
-        parameters.relinearizeSkip = 10;
+        parameters.relinearizeSkip = 1000;
         ISAM2 isam(parameters);
 
         double output_time = 0.0;
@@ -185,7 +185,7 @@ int main(int argc, char* argv[])
 
         NonlinearFactorGraph *graph = new NonlinearFactorGraph();
 
-        residuals.setZero(2500,2);
+        residuals.setZero(1000,2);
 
         // init. mixture model.
         // Init this from file later
@@ -235,8 +235,8 @@ int main(int argc, char* argv[])
                         ++factor_count;
                 }
 
-                graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
-                // graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, globalMixtureModel));
+                // graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
+                graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, globalMixtureModel));
 
                 prn_vec.push_back(svn);
                 factor_count_vec.push_back(++factor_count);
@@ -245,14 +245,15 @@ int main(int argc, char* argv[])
                         if (currKey > startKey ) {
                                 if ( lastStep == nextKey ) { break; }
                                 double scale = (get<0>(data[i+1])-get<0>(data[i]))*10.0;
-                                nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.5*scale, 0.5*scale, 0.5*scale, 1e3*scale, 1e-3*scale).finished());
+                                nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1.5*scale, 1.5*scale, 1.5*scale, 1e3*scale, 1e-3*scale).finished());
 
                                 graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-1), initEst, nonBias_ProcessNoise));
                                 ++factor_count;
 
-                                if (state_count < 500)
+                                if (state_count < 1200)
                                 {
                                         ++state_count;
+
                                         graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
 
                                         ++factor_count;
@@ -289,7 +290,7 @@ int main(int argc, char* argv[])
                         // Get residuals from graph
                         for (int i = 0; i<factor_count_vec.size(); i++) {
                                 ++res_count;
-                                if (res_count > 2499 )
+                                if (res_count > 999 )
                                 {
                                         residuals.conservativeResize(residuals.rows()+1, residuals.cols());
 
@@ -304,15 +305,15 @@ int main(int argc, char* argv[])
                         factor_count = -1;
 
 
-                        string res_str = "batch_" + to_string(numBatch) + ".residuals";
-                        ofstream res_os(res_str);
-                        if (res_count >= 2500)
+                        // string res_str = "batch_" + to_string(numBatch) + ".residuals";
+                        // ofstream res_os(res_str);
+                        if (res_count >= 1000)
                         {
-                                ++numBatch;
-                                for (unsigned int i=0; i<residuals.rows()-1; i++)
-                                {
-                                        res_os << residuals.block(i,0,1,2) << endl;
-                                }
+                                // ++numBatch;
+                                // for (unsigned int i=0; i<residuals.rows()-1; i++)
+                                // {
+                                //         res_os << residuals.block(i,0,1,2) << endl;
+                                // }
 
                                 StickBreak weights;
                                 vector<GaussWish> clusters;
@@ -322,7 +323,7 @@ int main(int argc, char* argv[])
                                 learnVDP(residuals, qZ, weights, clusters);
 
                                 std::cout << "Trying to Merge" << endl;
-                                globalMixtureModel = mergeMixtureModel(residuals, qZ, globalMixtureModel, clusters, weights, 0.1, 15);
+                                globalMixtureModel = mergeMixtureModel(residuals, qZ, globalMixtureModel, clusters, weights, 0.1, 10);
 
                                 cout << "\n\n\n\n\n\n" << endl;
                                 cout << "----------------- Merged MODEL ----------------" << endl;
@@ -333,7 +334,7 @@ int main(int argc, char* argv[])
                                         cout << mc.get<0>() << " " << mc.get<1>() << " "  <<  mc.get<2>() << "    " << mc.get<3>() <<"     "<< cov(0,0) << " " << cov(0,1) << " " << cov(1,1) <<"     "<<"\n\n" << endl;
                                 }
 
-                                residuals.setZero(2500,2);
+                                residuals.setZero(1000,2);
                                 res_count = -1;
                         }
 
