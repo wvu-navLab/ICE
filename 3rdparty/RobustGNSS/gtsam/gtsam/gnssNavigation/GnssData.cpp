@@ -126,12 +126,14 @@ vector<faultyRnxData> readGNSSFaulty(const std::string &fileLoc, const double &m
                            { epoch, svn, satXYZ, computed_range, rangeLC, phaseLC }
          */
         vector<faultyRnxData> data;
-        string data_file = findExampleDataFile(fileLoc);
-        ifstream is(data_file.c_str());
+        // string data_file = findExampleDataFile(fileLoc);
+        // ifstream is(data_file.c_str());
+        ifstream is(fileLoc.c_str());
 
-        std::default_random_engine generator;
+        std::default_random_engine gen1;
+        std::default_random_engine gen2;
         std::normal_distribution<double> dist1(mean, stdDev);
-        std::normal_distribution<double> dist2(mean, stdDev/100);
+        std::normal_distribution<double> dist2(mean, stdDev/10.0);
 
         double rangeMag, phaseMag;
 
@@ -148,12 +150,14 @@ vector<faultyRnxData> readGNSSFaulty(const std::string &fileLoc, const double &m
                 >> rho >> cb >> rel >> grav_delay >> trop_slant >>  windup >> satPC >> satX >> satY >> satZ >> break_flag >> c1Del >> c2Del;
                 if ( ((float) rand()/RAND_MAX) < percentFaulty) {
                         if ( ((double) rand() / (RAND_MAX)) > 0.5 ) {
-                                rangeLC += dist1(generator);
-                                phaseLC += dist2(generator);
+                                rho += dist1(gen1);
+                                // rangeLC += dist1(gen1);
+                                // phaseLC += dist2(gen2);
                         }
                         else {
-                                rangeLC -= dist1(generator);
-                                phaseLC -= dist2(generator);
+                                rho -= dist1(gen1);
+                                // rangeLC -= dist1(gen1);
+                                // phaseLC -= dist2(gen2);
                         }
                         faultInd = 1;
                         numFault++;

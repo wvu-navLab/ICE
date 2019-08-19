@@ -1,5 +1,5 @@
 /*
- * @file test_gnss_ice.cpp
+ * @file test_gnss_l2.cpp
  * @brief Iterative GPS Range/Phase Estimator with collected data
  * @author Ryan Watson
  */
@@ -12,6 +12,7 @@
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/gnssNavigation/GnssData.h>
 #include <gtsam/gnssNavigation/GnssTools.h>
+#include <gtsam/gnssNavigation/GNSSFactor.h>
 #include <gtsam/gnssNavigation/nonBiasStates.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/gnssNavigation/GNSSMultiModalFactor.h>
@@ -73,11 +74,10 @@ int main(int argc, char* argv[])
         const string green("\033[0;32m");
         string confFile, gnssFile, station;
         double xn, yn, zn, range, phase, rho, gnssTime;
-        int startKey(0), currKey, startEpoch(0), svn, numBatch(0), state_count(0);
+        int startKey(0), currKey, startEpoch(0), svn, state_count(0);
         int nThreads(-1), phase_break, break_count(0), nextKey, factor_count(-1), res_count(-1);
         bool printECEF, printENU, printAmb, first_ob(true);
         Eigen::MatrixXd residuals;
-        vector<mixtureComponents> globalMixtureModel;
 
         cout.precision(12);
 
@@ -113,14 +113,6 @@ int main(int argc, char* argv[])
         Point3 nomXYZ(xn, yn, zn);
         Point3 prop_xyz = nomXYZ;
 
-        // try { data = readGNSSFaulty(gnssFile, 50.0, 10.0, 0.3); }
-        // catch(std::exception& e)
-        // {
-        //         cout << red << "\n\n Cannot read GNSS data file " << endl;
-        //         exit(1);
-        // }
-
-
         try {data = readGNSS_SingleFreq(gnssFile); }
         catch(std::exception& e)
         {
@@ -128,6 +120,12 @@ int main(int argc, char* argv[])
                 exit(1);
         }
 
+        // try { data = readGNSSFaulty(gnssFile, 50.0, 10.0, 0.3); }
+        // catch(std::exception& e)
+        // {
+        //         cout << red << "\n\n Cannot read GNSS data file " << endl;
+        //         exit(1);
+        // }
 
         #ifdef GTSAM_USE_TBB
         std::auto_ptr<tbb::task_scheduler_init> init;
@@ -151,7 +149,6 @@ int main(int argc, char* argv[])
         parameters.relinearizeSkip = 1000;
         ISAM2 isam(parameters);
 
-        double output_time = 0.0;
         double rangeWeight = pow(2.5,2);
         double phaseWeight = pow(0.25,2);
 
@@ -185,22 +182,6 @@ int main(int argc, char* argv[])
 
         NonlinearFactorGraph *graph = new NonlinearFactorGraph();
 
-        residuals.setZero(1000,2);
-
-        // init. mixture model.
-        // Init this from file later
-        Eigen::RowVectorXd m(2);
-        m << 0.0, 0.0;
-
-        // Add comp 1.
-        Eigen::MatrixXd c(2,2);
-        c<< rangeWeight, 0.0, 0.0, phaseWeight;
-        globalMixtureModel.push_back(boost::make_tuple(0, 0, 0.0, m, c));
-
-        //Add comp 2.
-        c << rangeWeight*10.0, 0.0, 0.0, phaseWeight*10.0;
-        // globalMixtureModel.push_back(boost::make_tuple(0, 0, 0.0, m, c));
-
         int lastStep = get<0>(data.back());
 
         for(unsigned int i = startEpoch; i < data.size(); i++ ) {
@@ -208,8 +189,7 @@ int main(int argc, char* argv[])
                 double gnssTime = get<0>(data[i]);
                 int currKey = get<1>(data[i]);
                 if (first_ob) {
-                        first_ob=false;
-                        startKey = currKey;
+                        startKey = currKey; first_ob=false;
                         graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
                         ++factor_count;
                         initial_values.insert(X(currKey), initEst);
@@ -235,8 +215,12 @@ int main(int argc, char* argv[])
                         ++factor_count;
                 }
 
-                // graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
-                graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, globalMixtureModel));
+                // double rw = elDepWeight(satXYZ, nomXYZ, rangeWeight);
+                double rw = rangeWeight;
+                // double pw = elDepWeight(satXYZ, nomXYZ, phaseWeight);
+                double pw = phaseWeight;
+
+                graph->add(boost::make_shared<GNSSFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, diagNoise::Variances( (gtsam::Vector(2) << rw, pw).finished() )));
 
                 prn_vec.push_back(svn);
                 factor_count_vec.push_back(++factor_count);
@@ -245,6 +229,7 @@ int main(int argc, char* argv[])
                         if (currKey > startKey ) {
                                 if ( lastStep == nextKey ) { break; }
                                 double scale = (get<0>(data[i+1])-get<0>(data[i]))*10.0;
+                                // initial_values.insert(X(nextKey),initEst);
                                 nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1.5*scale, 1.5*scale, 1.5*scale, 1e3*scale, 1e-3*scale).finished());
 
                                 graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-1), initEst, nonBias_ProcessNoise));
@@ -253,7 +238,6 @@ int main(int argc, char* argv[])
                                 if (state_count < 1200)
                                 {
                                         ++state_count;
-
                                         graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
 
                                         ++factor_count;
@@ -285,79 +269,13 @@ int main(int argc, char* argv[])
                                 cout << endl;
                         }
 
-                        output_time = output_time +1;
-
-                        // Get residuals from graph
-                        for (int i = 0; i<factor_count_vec.size(); i++) {
-                                ++res_count;
-                                if (res_count > 999 )
-                                {
-                                        residuals.conservativeResize(residuals.rows()+1, residuals.cols());
-
-                                        residuals.row(residuals.rows()-1) = graph->at(factor_count_vec[i])->residual(result).transpose();
-                                }
-                                else
-                                {
-                                        residuals.block(res_count,0,1,2) << graph->at(factor_count_vec[i])->residual(result).transpose();
-                                }
-                        }
-                        factor_count_vec.clear();
-                        factor_count = -1;
-
-
-                        // string res_str = "batch_" + to_string(numBatch) + ".residuals";
-                        // ofstream res_os(res_str);
-                        if (res_count >= 1000)
-                        {
-                                // ++numBatch;
-                                // for (unsigned int i=0; i<residuals.rows()-1; i++)
-                                // {
-                                //         res_os << residuals.block(i,0,1,2) << endl;
-                                // }
-
-                                StickBreak weights;
-                                vector<GaussWish> clusters;
-                                Eigen::MatrixXd qZ;
-
-                                std::cout << "Trying to Cluster" << endl;
-                                learnVDP(residuals, qZ, weights, clusters);
-
-                                std::cout << "Trying to Merge" << endl;
-                                globalMixtureModel = mergeMixtureModel(residuals, qZ, globalMixtureModel, clusters, weights, 0.1, 10);
-
-                                cout << "\n\n\n\n\n\n" << endl;
-                                cout << "----------------- Merged MODEL ----------------" << endl;
-                                for (int i=0; i<globalMixtureModel.size(); i++)
-                                {
-                                        mixtureComponents mc = globalMixtureModel[i];
-                                        auto cov = mc.get<4>();
-                                        cout << mc.get<0>() << " " << mc.get<1>() << " "  <<  mc.get<2>() << "    " << mc.get<3>() <<"     "<< cov(0,0) << " " << cov(0,1) << " " << cov(1,1) <<"     "<<"\n\n" << endl;
-                                }
-
-                                residuals.setZero(1000,2);
-                                res_count = -1;
-                        }
-
                         graph->resize(0);
                         initial_values.clear();
                         prn_vec.clear();
                         initial_values.insert(X(nextKey), prior_nonBias);
-                        // initial_values.insert(X(nextKey), initEst);
-                        // graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, nonBias_ProcessNoise));
-                        // ++factor_count;
                 }
 
         }
         // isam.saveGraph("gnss.tree");
-
-        cout << "\n\n\n\n\n\n" << endl;
-        cout << "----------------- Final Mixture MODEL ----------------" << endl;
-        for (int i=0; i<globalMixtureModel.size(); i++)
-        {
-                mixtureComponents mc = globalMixtureModel[i];
-                auto cov = mc.get<4>();
-                cout << mc.get<0>() << " " << mc.get<1>() << " "  <<  mc.get<2>() << "    " << mc.get<3>() <<"     "<< cov(0,0) << " " << cov(0,1) << " " << cov(1,1) <<"     "<<"\n\n" << endl;
-        }
-
         return 0;
 }

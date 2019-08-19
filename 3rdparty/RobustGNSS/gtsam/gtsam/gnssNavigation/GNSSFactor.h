@@ -40,7 +40,7 @@ virtual ~GNSSFactor() {
 }
 
 GNSSFactor(Key deltaStates, Key bias, const Vector2 measurement,
-           const Point3 satXYZ, const Point3 nomXYZ,const SharedNoiseModel &model) :
+           const Point3 satXYZ, const Point3 nomXYZ, const SharedNoiseModel &model) :
         Base(model, deltaStates, bias), measured_(measurement)
 {
         satXYZ_=satXYZ;

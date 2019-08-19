@@ -12,7 +12,6 @@
 #include <gtsam/geometry/Point4.h>
 #include <gtsam/gnssNavigation/GnssData.h>
 #include <gtsam/gnssNavigation/GnssTools.h>
-#include <gtsam/gnssNavigation/gnssStateVec.h>
 
 #ifndef FOREACH_HPP
   #define FOREACH_HPP

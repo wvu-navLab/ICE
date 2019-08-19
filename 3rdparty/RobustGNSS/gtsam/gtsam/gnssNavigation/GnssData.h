@@ -16,9 +16,7 @@
 #include <gtsam/base/VectorSpace.h>
 #include <gtsam/robustModels/GNSSSwitch.h>
 #include <gtsam/gnssNavigation/GnssTools.h>
-#include <gtsam/gnssNavigation/gnssStateVec.h>
 #include <gtsam/gnssNavigation/nonBiasStates.h>
-#include <gtsam/robustModels/PseudorangeSwitchFactor.h>
 
 #include "boost/foreach.hpp"
 

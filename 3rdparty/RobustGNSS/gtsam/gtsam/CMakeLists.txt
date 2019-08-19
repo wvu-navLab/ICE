@@ -15,6 +15,7 @@ set (gtsam_subdirs
     smart
     navigation
     gnssNavigation
+    configReader
     robustModels
 )
 
