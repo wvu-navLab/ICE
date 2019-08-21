@@ -170,10 +170,9 @@ int main(int argc, char* argv[])
 
         noiseModel::Diagonal::shared_ptr nonBias_InitNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.2, 0.2, 0.2, 3e6, 1e-1).finished());
 
-        noiseModel::Diagonal::shared_ptr nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.5, 0.5, 0.5, 1e3, 1e-3).finished());
+        noiseModel::Diagonal::shared_ptr nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 2.5, 2.5, 2.5, 1e3, 1e-3).finished());
 
         noiseModel::Diagonal::shared_ptr initNoise = noiseModel::Diagonal::Variances((gtsam::Vector(1) << 3e6).finished());
-
         // noiseModel::Diagonal::shared_ptr nonBias_InitNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 10.0, 10.0, 10.0, 3e8, 1e-1).finished());
         //
         // noiseModel::Diagonal::shared_ptr nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.1, 0.1, 0.1, 3e6, 3e-5).finished());
@@ -185,6 +184,9 @@ int main(int argc, char* argv[])
         int lastStep = get<0>(data.back());
 
         for(unsigned int i = startEpoch; i < data.size(); i++ ) {
+
+
+                auto start = high_resolution_clock::now();
 
                 double gnssTime = get<0>(data[i]);
                 int currKey = get<1>(data[i]);
@@ -215,9 +217,7 @@ int main(int argc, char* argv[])
                         ++factor_count;
                 }
 
-                // double rw = elDepWeight(satXYZ, nomXYZ, rangeWeight);
                 double rw = rangeWeight;
-                // double pw = elDepWeight(satXYZ, nomXYZ, phaseWeight);
                 double pw = phaseWeight;
 
                 graph->add(boost::make_shared<GNSSFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, diagNoise::Variances( (gtsam::Vector(2) << rw, pw).finished() )));
@@ -229,15 +229,15 @@ int main(int argc, char* argv[])
                         if (currKey > startKey ) {
                                 if ( lastStep == nextKey ) { break; }
                                 double scale = (get<0>(data[i+1])-get<0>(data[i]))*10.0;
-                                // initial_values.insert(X(nextKey),initEst);
-                                nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1.5*scale, 1.5*scale, 1.5*scale, 1e3*scale, 1e-3*scale).finished());
+                                nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 10.0*scale, 10.0*scale, 10.0*scale, 1e3*scale, 1e-3*scale).finished());
 
                                 graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-1), initEst, nonBias_ProcessNoise));
                                 ++factor_count;
 
-                                if (state_count < 1200)
+                                if (state_count < 1200) // i.e., static for 1 min.
                                 {
                                         ++state_count;
+
                                         graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
 
                                         ++factor_count;
@@ -272,6 +272,12 @@ int main(int argc, char* argv[])
                         graph->resize(0);
                         initial_values.clear();
                         prn_vec.clear();
+                        auto stop = high_resolution_clock::now();
+                        auto duration = duration_cast<microseconds>(stop - start);
+
+                        cout << "Delta time: "
+                             << duration.count() << " microseconds" << endl;
+
                         initial_values.insert(X(nextKey), prior_nonBias);
                 }
 

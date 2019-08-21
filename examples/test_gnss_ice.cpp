@@ -152,8 +152,8 @@ int main(int argc, char* argv[])
         ISAM2 isam(parameters);
 
         double output_time = 0.0;
-        double rangeWeight = pow(2.5,2);
-        double phaseWeight = pow(0.25,2);
+        double rangeWeight = 2.5;
+        double phaseWeight = 0.25;
 
         ifstream file(gnssFile.c_str());
         string value;
@@ -173,7 +173,7 @@ int main(int argc, char* argv[])
 
         noiseModel::Diagonal::shared_ptr nonBias_InitNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.2, 0.2, 0.2, 3e6, 1e-1).finished());
 
-        noiseModel::Diagonal::shared_ptr nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.5, 0.5, 0.5, 1e3, 1e-3).finished());
+        noiseModel::Diagonal::shared_ptr nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 2.5, 2.5, 2.5, 1e3, 1e-3).finished());
 
         noiseModel::Diagonal::shared_ptr initNoise = noiseModel::Diagonal::Variances((gtsam::Vector(1) << 3e6).finished());
 
@@ -203,7 +203,11 @@ int main(int argc, char* argv[])
 
         int lastStep = get<0>(data.back());
 
+        std::vector<int> num_obs (1000, 0);
+
         for(unsigned int i = startEpoch; i < data.size(); i++ ) {
+
+                auto start = high_resolution_clock::now();
 
                 double gnssTime = get<0>(data[i]);
                 int currKey = get<1>(data[i]);
@@ -235,7 +239,6 @@ int main(int argc, char* argv[])
                         ++factor_count;
                 }
 
-                // graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
                 graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, globalMixtureModel));
 
                 prn_vec.push_back(svn);
@@ -245,12 +248,12 @@ int main(int argc, char* argv[])
                         if (currKey > startKey ) {
                                 if ( lastStep == nextKey ) { break; }
                                 double scale = (get<0>(data[i+1])-get<0>(data[i]))*10.0;
-                                nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1.5*scale, 1.5*scale, 1.5*scale, 1e3*scale, 1e-3*scale).finished());
+                                nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 10.0*scale, 10.0*scale, 10.0*scale, 1e3*scale, 1e-3*scale).finished());
 
                                 graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-1), initEst, nonBias_ProcessNoise));
                                 ++factor_count;
 
-                                if (state_count < 1200)
+                                if (state_count < 1200) // i.e., static for 1 min.
                                 {
                                         ++state_count;
 
@@ -260,6 +263,8 @@ int main(int argc, char* argv[])
                                 }
 
                         }
+
+                        // get the init. estimate to calculate residuals.
                         isam.update(*graph, initial_values);
                         isam.update();
                         result = isam.calculateEstimate();
@@ -287,27 +292,95 @@ int main(int argc, char* argv[])
 
                         output_time = output_time +1;
 
-                        // Get residuals from graph
-                        for (int i = 0; i<factor_count_vec.size(); i++) {
-                                ++res_count;
-                                if (res_count > 999 )
-                                {
-                                        residuals.conservativeResize(residuals.rows()+1, residuals.cols());
 
-                                        residuals.row(residuals.rows()-1) = graph->at(factor_count_vec[i])->residual(result).transpose();
+                        // Only consider residuals which don't agree with the model
+                        int ind(0);
+                        double prob, probMax(0.0);
+                        gtsam::Matrix cov_min(2,2);
+                        Eigen::RowVectorXd mean_min(2);
+                        Eigen::VectorXd res(2), res_2(2), res_min(2);
+
+                        for (int i = 0; i<factor_count_vec.size(); i++)
+                        {
+
+                                res = graph->at(factor_count_vec[i])->residual(result);
+
+                                for (int j=0; j<globalMixtureModel.size(); j++)
+                                {
+                                        merge::mixtureComponents mixtureComp = globalMixtureModel[j];
+
+                                        Eigen::RowVectorXd mean = mixtureComp.get<3>();
+
+                                        res_2 << res(0) - mean(0), res(1) - mean(1);
+                                        double quadform  = (res).transpose() * (mixtureComp.get<4>()).inverse() * (res);
+                                        double norm = std::pow(std::sqrt(2 * M_PI),-1) * std::pow((mixtureComp.get<4>()).determinant(), -0.5);
+
+                                        prob =  norm * exp(-0.5 * quadform);
+
+                                        if (prob >= probMax)
+                                        {
+                                                ind = j;
+                                                probMax = prob;
+                                                cov_min = mixtureComp.get<4>();
+                                                mean_min = mixtureComp.get<3>();
+                                                res_min = res_2;
+                                        }
+                                }
+
+                                // Use z-test to see if residuals is considered an outlier
+                                double z_r = (res_min(0))/cov_min(0,0);
+                                double z_p = (res_min(1))/cov_min(1,1);
+                                // double z_r = (res_min(0) - mean_min(0))/cov_min(0,0);
+                                // double z_p = (res_min(1) - mean_min(1))/cov_min(1,1);
+
+                                // only consider residuals more than 'n' stds from model
+                                if (std::abs(z_r) > 3.0 || std::abs(z_p) > 3.0)
+                                {
+                                        ++res_count;
+                                        if (res_count > 999 )
+                                        {
+                                                residuals.conservativeResize(residuals.rows()+1, residuals.cols());
+
+                                                residuals.row(residuals.rows()-1) = graph->at(factor_count_vec[i])->residual(result).transpose();
+
+                                                // graph->remove(factor_count_vec[i]);
+                                        }
+                                        else
+                                        {
+                                                residuals.block(res_count,0,1,2) << graph->at(factor_count_vec[i])->residual(result).transpose();
+
+                                                // Need to add a check to make sure that enough observations are still in the graph to constraint the state. Otherwise, remove the current state from the graph.
+                                                // graph->remove(factor_count_vec[i]);
+                                        }
                                 }
                                 else
                                 {
-                                        residuals.block(res_count,0,1,2) << graph->at(factor_count_vec[i])->residual(result).transpose();
+                                        num_obs.at(ind) = num_obs.at(ind)+1;
                                 }
                         }
+
+                        // Get residuals from graph
+                        // for (int i = 0; i<factor_count_vec.size(); i++) {
+                        //         if (res_count > 999 )
+                        //         {
+                        //                 residuals.conservativeResize(residuals.rows()+1, residuals.cols());
+                        //
+                        //                 residuals.row(residuals.rows()-1) = graph->at(factor_count_vec[i])->residual(result).transpose();
+                        //         }
+                        //         else
+                        //         {
+                        //                 residuals.block(res_count,0,1,2) << graph->at(factor_count_vec[i])->residual(result).transpose();
+                        //         }
+                        // }
+
+
                         factor_count_vec.clear();
                         factor_count = -1;
 
 
                         // string res_str = "batch_" + to_string(numBatch) + ".residuals";
                         // ofstream res_os(res_str);
-                        if (res_count >= 1000)
+                        if (res_count > 1000)
                         {
                                 // ++numBatch;
                                 // for (unsigned int i=0; i<residuals.rows()-1; i++)
@@ -319,32 +392,40 @@ int main(int argc, char* argv[])
                                 vector<GaussWish> clusters;
                                 Eigen::MatrixXd qZ;
 
-                                std::cout << "Trying to Cluster" << endl;
                                 learnVDP(residuals, qZ, weights, clusters);
 
-                                std::cout << "Trying to Merge" << endl;
-                                globalMixtureModel = mergeMixtureModel(residuals, qZ, globalMixtureModel, clusters, weights, 0.1, 10);
+                                // update the number of obs in each component
+                                globalMixtureModel = updateObs(globalMixtureModel, num_obs);
+                                std::fill(num_obs.begin(), num_obs.end(), 0);
 
-                                cout << "\n\n\n\n\n\n" << endl;
-                                cout << "----------------- Merged MODEL ----------------" << endl;
-                                for (int i=0; i<globalMixtureModel.size(); i++)
-                                {
-                                        mixtureComponents mc = globalMixtureModel[i];
-                                        auto cov = mc.get<4>();
-                                        cout << mc.get<0>() << " " << mc.get<1>() << " "  <<  mc.get<2>() << "    " << mc.get<3>() <<"     "<< cov(0,0) << " " << cov(0,1) << " " << cov(1,1) <<"     "<<"\n\n" << endl;
-                                }
+                                // merge the curr and prior mixture models.
+                                globalMixtureModel = mergeMixtureModel(residuals, qZ, globalMixtureModel, clusters, weights, 0.05, 100);
+
+                                // cout << "\n\n\n\n\n\n" << endl;
+                                // cout << "----------------- Merged MODEL ----------------" << endl;
+                                // for (int i=0; i<globalMixtureModel.size(); i++)
+                                // {
+                                //         mixtureComponents mc = globalMixtureModel[i];
+                                //         auto cov = mc.get<4>();
+                                //         cout << mc.get<0>() << " " << mc.get<1>() << " "  <<  mc.get<2>() << "    " << mc.get<3>() <<"     "<< cov(0,0) << " " << cov(0,1) << " " << cov(1,1) <<"     "<<"\n\n" << endl;
+                                // }
 
                                 residuals.setZero(1000,2);
                                 res_count = -1;
                         }
 
+
                         graph->resize(0);
                         initial_values.clear();
                         prn_vec.clear();
+
+                        auto stop = high_resolution_clock::now();
+                        auto duration = duration_cast<microseconds>(stop - start);
+
+                        cout << "Delta time: "
+                             << duration.count() << " microseconds" << endl;
+
                         initial_values.insert(X(nextKey), prior_nonBias);
-                        // initial_values.insert(X(nextKey), initEst);
-                        // graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, nonBias_ProcessNoise));
-                        // ++factor_count;
                 }
 
         }

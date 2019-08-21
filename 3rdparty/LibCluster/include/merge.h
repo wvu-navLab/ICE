@@ -52,6 +52,10 @@ bool checkMeanGMM(mixtureComponents priorModel, mixtureComponents currModel, dou
 // get weight vector from prior model
 vector<double> getPriorWeights(vector<mixtureComponents> gmm);
 
+// update num obs per component
+vector<mixtureComponents> updateObs(vector<mixtureComponents> gmm, vector<int> numObs);
+
+
 // prune the GMM to the truncation level
 vector<mixtureComponents> pruneMixtureModel(vector<mixtureComponents> gmm, int truncLevel);
 bool sortbyobs(mixtureComponents a, mixtureComponents b);

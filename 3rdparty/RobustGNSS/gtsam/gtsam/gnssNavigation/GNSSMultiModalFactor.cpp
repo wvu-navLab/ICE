@@ -50,9 +50,6 @@ Vector GNSSMultiModalFactor::whitenedError(const gtsam::Values& x,
 
                 prob =  norm * exp(-0.5 * quadform);
 
-
-                // prob = std::sqrt((mixtureComp.get<4>()).determinant()) * exp(-0.5*errW.dot(errW));
-
                 if (prob >= probMax)
                 {
                         ind = i;
@@ -80,16 +77,6 @@ Vector GNSSMultiModalFactor::whitenedError(const gtsam::Values& x,
                 (*H)[0] = H_g;
                 (*H)[1] = H_b;
 
-                // if (iter_count_ > 4)
-                // {
-                //         if (std::abs(res(0)) > 25.0 || std::abs(res(1)) > 0.5)
-                //         {
-                //                 (*H)[0] = H_g*0.0;
-                //                 (*H)[1] = H_b*0.0;
-                //
-                //         }
-                // return (gtsam::noiseModel::Gaussian::Covariance(cov_min))->whiten(res_2);
-                // }
         }
 
         return (gtsam::noiseModel::Gaussian::Covariance(cov_min))->whiten(res_2);
@@ -132,9 +119,6 @@ Vector GNSSMultiModalFactor::unwhitenedError(const gtsam::Values& x,
 
                 prob =  norm * exp(-0.5 * quadform);
 
-
-                // prob = 1.0 / std::sqrt((mixtureComp.get<4>()).determinant()) * exp(-0.5*errW.dot(errW));
-
                 if (prob >= probMax)
                 {
                         ind = i;
@@ -162,16 +146,6 @@ Vector GNSSMultiModalFactor::unwhitenedError(const gtsam::Values& x,
                 (*H)[0] = H_g;
                 (*H)[1] = H_b;
 
-                // if (iter_count_ > 4)
-                // {
-                //         if (std::abs(res(0)) > 25.0 || std::abs(res(1)) > 0.5)
-                //         {
-                //                 (*H)[0] = H_g*0.0;
-                //                 (*H)[1] = H_b*0.0;
-                //
-                //         }
-                //         return res_2;
-                // }
         }
 
 

@@ -202,6 +202,29 @@ bool merge::sortbyobs(merge::mixtureComponents a, merge::mixtureComponents b)
 }
 
 
+vector<merge::mixtureComponents> merge::updateObs(vector<merge::mixtureComponents> gmm, vector<int> numObs)
+{
+        unsigned int N(0);
+        for (unsigned int i=0; i<gmm.size(); i++)
+        {
+                N+= numObs.at(i);
+        }
+
+        for (unsigned int i=0; i<gmm.size(); i++)
+        {
+                // update total num of obs.
+                gmm[i].get<0>() = gmm[i].get<0>() + N;
+                if (numObs.at(i) != 0 )
+                {
+                        // update num of obs in component
+                        gmm[i].get<1>() = gmm[i].get<1>() +numObs.at(i);
+                        // update components weight.
+                        gmm[i].get<2>() = gmm[i].get<1>() / gmm[i].get<0>();
+                }
+        }
+        return gmm;
+}
+
 vector<merge::mixtureComponents> merge::pruneMixtureModel(vector<merge::mixtureComponents> gmm, int truncLevel)
 {
         if (gmm.size() < truncLevel)
