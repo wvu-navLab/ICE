@@ -53,7 +53,7 @@ GNSSMultiModalFactor() : measured_() {
 }
 
 GNSSMultiModalFactor(Key deltaStates, Key bias, const Vector2 measurement,
-                     const Point3 satXYZ, const Point3 nomXYZ, vector<merge::mixtureComponents> gmm) :
+                     const Point3 satXYZ, const Point3 nomXYZ, vector<merge::mixtureComponents>& gmm) :
         Base(cref_list_of<2>(deltaStates)(bias)), k1_(deltaStates), k2_(bias), measured_(measurement), satXYZ_(satXYZ), nomXYZ_(nomXYZ), gmm_(gmm), iter_count_(0) {
 }
 
