@@ -73,7 +73,7 @@ int main(int argc, char* argv[])
         const string red("\033[0;31m");
         const string green("\033[0;32m");
         string confFile, gnssFile, station;
-        double xn, yn, zn, range, phase, rho, gnssTime;
+        double xn, yn, zn, range, phase, rho, gnssTime, prev_time;
         int ob_count(0), state_skip(0), tmp(0);
         int startKey(0), currKey, startEpoch(0), svn, numBatch(0), state_count(0), update_count(0);
         int nThreads(-1), phase_break, break_count(0), nextKey, factor_count(-1), res_count(-1);
@@ -114,14 +114,6 @@ int main(int argc, char* argv[])
 
         Point3 nomXYZ(xn, yn, zn);
         Point3 prop_xyz = nomXYZ;
-
-        // try { data = readGNSSFaulty(gnssFile, 50.0, 10.0, 0.3); }
-        // catch(std::exception& e)
-        // {
-        //         cout << red << "\n\n Cannot read GNSS data file " << endl;
-        //         exit(1);
-        // }
-
 
         try {data = readGNSS_SingleFreq(gnssFile); }
         catch(std::exception& e)
@@ -175,15 +167,12 @@ int main(int argc, char* argv[])
 
         noiseModel::Diagonal::shared_ptr nonBias_InitNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.1, 0.1, 0.1, 3e6, 1e-1).finished());
 
+
+        noiseModel::Diagonal::shared_ptr nonBias_Reset = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1e4, 1e4, 1e4, 3e6, 1e-1).finished());
+
         noiseModel::Diagonal::shared_ptr nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1.0, 1.0, 1.0, 1e3, 1e-3).finished());
 
         noiseModel::Diagonal::shared_ptr initNoise = noiseModel::Diagonal::Variances((gtsam::Vector(1) << 3e6).finished());
-
-        // noiseModel::Diagonal::shared_ptr nonBias_InitNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 10.0, 10.0, 10.0, 3e8, 1e-1).finished());
-        //
-        // noiseModel::Diagonal::shared_ptr nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.1, 0.1, 0.1, 3e6, 3e-5).finished());
-        //
-        // noiseModel::Diagonal::shared_ptr initNoise = noiseModel::Diagonal::Variances((gtsam::Vector(1) << 100).finished());
 
         NonlinearFactorGraph *graph = new NonlinearFactorGraph();
 
@@ -250,7 +239,6 @@ int main(int argc, char* argv[])
 
                 if (currKey != nextKey && nextKey != 0) {
                         if (ob_count < 5) {
-                                cout << "HERE EEE" << endl;
                                 for (unsigned int i=0; i<factor_count_vec.size(); i++)
                                 {
                                         graph->remove(factor_count_vec[i]);
@@ -262,7 +250,6 @@ int main(int argc, char* argv[])
                                 factor_count_vec.clear();
                                 factor_count = -1;
 
-                                // isam.update(*graph, initial_values.filter<phaseBias>());
                                 isam.update(*graph, initial_values);
                                 graph->resize(0);
 
@@ -270,65 +257,46 @@ int main(int argc, char* argv[])
                                 continue;
                         }
 
+                        ++state_count;
                         if (currKey > startKey ) {
                                 if ( lastStep == nextKey ) { break; }
 
-                                // double scale = (get<0>(data[i+state_skip])-get<0>(data[i]))*10.0;
-                                // nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 10.0*scale, 10.1*scale, 10.0*scale, 1e3*scale, 1e-3*scale).finished());
-                                //
-                                // cout << "state skip" << state_skip << endl;
-                                //
-                                // graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-state_skip), initEst, nonBias_ProcessNoise));
 
-                                if (state_count < 1200) // i.e., static for 1 min.
+                                if (state_count < 1200) // i.e., static for 2 mins.
                                 {
-                                        ++state_count;
-
                                         graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
 
                                         ++factor_count;
                                 }
-                                // else {
-                                //         ++state_count;
-                                //
-                                //         double scale = (get<0>(data[i+1])-get<0>(data[i]))*10.0;
-                                //         nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 10.0*scale, 10.1*scale, 10.0*scale, 1e3*scale, 1e-3*scale).finished());
-                                //
-                                //         graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, nonBias_ProcessNoise));
-                                //
-                                //         ++factor_count;
-                                // }
+
+                                // if skip more than 5 epochs -- reinitialize state est.
+                                if (state_skip > 5)
+                                {
+
+                                        cout << "State Count == " << state_count << " SKIPPED TOO MANY" << endl;
+                                        graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, nonBias_Reset));
+                                }
+                                else {
+                                        double scale = (gnssTime - prev_time)*10.0;
+
+                                        if (scale == 0) {scale = 1.0; }
+
+                                        nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.5*scale, 0.5*scale, 0.5*scale, 1e3*scale, 1e-3*scale).finished());
+
+                                        // graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, nonBias_ProcessNoise));
+                                        graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-state_skip), initEst, nonBias_ProcessNoise));
+                                }
 
                         }
 
                         // get the init. estimate to calculate residuals.
                         isam.update(*graph, initial_values);
+                        for (unsigned int j; j < 50; j++ )
+                        {
+                                isam.update();
+                        }
                         result = isam.calculateEstimate();
-                        cout << ++update_count << " num obs = " << ob_count << endl;
 
-                        // prior_nonBias = result.at<nonBiasStates>(X(currKey));
-                        // Point3 delta_xyz = (gtsam::Vector(3) << prior_nonBias.x(), prior_nonBias.y(), prior_nonBias.z()).finished();
-                        // prop_xyz = nomXYZ - delta_xyz;
-                        //
-                        // if (printECEF) {
-                        //         cout << "xyz " << gnssTime << " " << prop_xyz.x() << " " << prop_xyz.y() << " " << prop_xyz.z() << endl;
-                        // }
-                        //
-                        // if (printENU) {
-                        //         Point3 enu = xyz2enu(prop_xyz, nomXYZ);
-                        //         cout << "enu " << gnssTime << " " << enu.x() << " " << enu.y() << " " << enu.z() << endl;
-                        // }
-                        //
-                        // if (printAmb) {
-                        //         cout << "gps " << " " << gnssTime << " ";
-                        //         for (int k=0; k<prn_vec.size(); k++) {
-                        //                 cout << result.at<phaseBias>(G(bias_counter[prn_vec[k]])) << " ";
-                        //         }
-                        //         cout << endl;
-                        // }
-                        //
-                        // output_time = output_time +1;
-                        //
 
                         // Only consider residuals which don't agree with the model
                         int ind(0);
@@ -398,12 +366,7 @@ int main(int argc, char* argv[])
 
                         if (ob_count > 4) {
                                 ++tmp;
-                                cout << "num state updates == " << tmp << endl;
 
-                                if (tmp == 4289 || tmp == 4290 || tmp == 4288 || tmp == 4291)
-                                {
-                                        graph->print();
-                                }
                                 isam.update(*graph);
                                 isam.update();
                                 result = isam.calculateEstimate();
@@ -429,6 +392,8 @@ int main(int argc, char* argv[])
                                         cout << endl;
                                 }
                                 state_skip = 1;
+                                prev_time = gnssTime;
+
                         }
                         else{
                                 ++state_skip;
@@ -462,14 +427,14 @@ int main(int argc, char* argv[])
                                 // merge the curr and prior mixture models.
                                 globalMixtureModel = mergeMixtureModel(residuals, qZ, globalMixtureModel, clusters, weights, 0.05, 20);
 
-                                cout << "\n\n\n\n\n\n" << endl;
-                                cout << "----------------- Merged MODEL ----------------" << endl;
-                                for (int i=0; i<globalMixtureModel.size(); i++)
-                                {
-                                        mixtureComponents mc = (globalMixtureModel)[i];
-                                        auto cov = mc.get<4>();
-                                        cout << mc.get<0>() << " " << mc.get<1>() << " "  <<  mc.get<2>() << "    " << mc.get<3>() <<"     "<< cov(0,0) << " " << cov(0,1) << " " << cov(1,1) <<"     "<<"\n\n" << endl;
-                                }
+                                // cout << "\n\n\n\n\n\n" << endl;
+                                // cout << "----------------- Merged MODEL ----------------" << endl;
+                                // for (int i=0; i<globalMixtureModel.size(); i++)
+                                // {
+                                //         mixtureComponents mc = (globalMixtureModel)[i];
+                                //         auto cov = mc.get<4>();
+                                //         cout << mc.get<0>() << " " << mc.get<1>() << " "  <<  mc.get<2>() << "    " << mc.get<3>() <<"     "<< cov(0,0) << " " << cov(0,1) << " " << cov(1,1) <<"     "<<"\n\n" << endl;
+                                // }
 
                                 residuals.setZero(1000,2);
                                 res_count = -1;
