@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
         // define std out print color
         bool skipped_update(false);
         vector<int> prn_vec;
-        vector<int> factor_count_vec;
+        vector<int> factor_count_vec, gnss_count_vec;
         vector<rnxData> data;
         // vector<faultyRnxData> data;
         const string red("\033[0;31m");
@@ -141,7 +141,7 @@ int main(int argc, char* argv[])
 
         ISAM2DoglegParams doglegParams;
         ISAM2Params parameters;
-        parameters.relinearizeThreshold = 0.01;
+        parameters.relinearizeThreshold = 0.1;
         parameters.relinearizeSkip = 1000;
         ISAM2 isam(parameters);
 
@@ -162,10 +162,10 @@ int main(int argc, char* argv[])
         nonBiasStates initEst(Z_5x1);
         nonBiasStates between_nonBias_State(Z_5x1);
 
-        Values initial_values;
+        Values initial_values, full_values;
         Values result;
 
-        noiseModel::Diagonal::shared_ptr nonBias_InitNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.1, 0.1, 0.1, 3e6, 1e-1).finished());
+        noiseModel::Diagonal::shared_ptr nonBias_InitNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.2, 0.2, 0.2, 3e6, 1e-1).finished());
 
 
         noiseModel::Diagonal::shared_ptr nonBias_Reset = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1e4, 1e4, 1e4, 3e6, 1e-1).finished());
@@ -175,6 +175,7 @@ int main(int argc, char* argv[])
         noiseModel::Diagonal::shared_ptr initNoise = noiseModel::Diagonal::Variances((gtsam::Vector(1) << 3e6).finished());
 
         NonlinearFactorGraph *graph = new NonlinearFactorGraph();
+        NonlinearFactorGraph *full_graph = new NonlinearFactorGraph();
 
         residuals.setZero(1000,2);
 
@@ -187,10 +188,6 @@ int main(int argc, char* argv[])
         Eigen::MatrixXd c(2,2);
         c<< std::pow(rangeWeight,2), 0.0, 0.0, std::pow(phaseWeight,2);
         globalMixtureModel.push_back(boost::make_tuple(0, 0, 0.0, m, c));
-
-        //Add comp 2.
-        c << rangeWeight*10.0, 0.0, 0.0, phaseWeight*10.0;
-        // globalMixtureModel.push_back(boost::make_tuple(0, 0, 0.0, m, c));
 
         int lastStep = get<0>(data.back());
 
@@ -206,8 +203,10 @@ int main(int argc, char* argv[])
                         first_ob=false;
                         startKey = currKey;
                         graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
+                        full_graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
                         ++factor_count;
                         initial_values.insert(X(currKey), initEst);
+                        full_values.insert(X(currKey), initEst);
                 }
                 int nextKey = get<1>(data[i+1]);
                 int svn = get<2>(data[i]);
@@ -217,7 +216,7 @@ int main(int argc, char* argv[])
                 double phase = get<6>(data[i]);
                 double phase_break = get<7>(data[i]);
 
-                ++ob_count;
+                ob_count = ob_count + 1;
 
                 gtsam::Vector2 obs;
                 obs << range-rho, phase-rho;
@@ -227,74 +226,120 @@ int main(int argc, char* argv[])
                         bias_state[0] = phase-range;
                         if (currKey > startKey) { bias_counter[svn] = bias_counter[svn] +1; }
                         initial_values.insert(G(bias_counter[svn]), bias_state);
+                        full_values.insert(G(bias_counter[svn]), bias_state);
                         graph->add(boost::make_shared<PriorFactor<phaseBias> >(G(bias_counter[svn]), bias_state,  initNoise));
+                        full_graph->add(boost::make_shared<PriorFactor<phaseBias> >(G(bias_counter[svn]), bias_state,  initNoise));
                         phase_arc[svn] = phase_break;
-                        ++factor_count;
+                        gnss_count_vec.push_back(++factor_count);
                 }
 
-                graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, globalMixtureModel));
+                // graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, globalMixtureModel));
+                graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
+                full_graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
 
                 prn_vec.push_back(svn);
                 factor_count_vec.push_back(++factor_count);
 
                 if (currKey != nextKey && nextKey != 0) {
-                        if (ob_count < 5) {
+                        if (ob_count < 5 || (ob_count < 6 && state_skip > 10) ) {
+
+                                cout << "No obs, state update == "<< state_count << endl;
+
+                                // remove all gnss factors
                                 for (unsigned int i=0; i<factor_count_vec.size(); i++)
                                 {
                                         graph->remove(factor_count_vec[i]);
+                                        full_graph->remove(factor_count_vec[i]);
                                 }
 
+                                // remove current state node
+                                if (initial_values.exists(X(currKey)))
+                                {
+                                        initial_values.erase(X(currKey));
+                                        full_values.erase(X(currKey));
+                                }
                                 initial_values.insert(X(nextKey), prior_nonBias);
+                                full_values.insert(X(nextKey), prior_nonBias);
+                                // initial_values.insert(X(nextKey), initEst);
                                 ob_count = 0;
                                 prn_vec.clear();
                                 factor_count_vec.clear();
+                                gnss_count_vec.clear();
                                 factor_count = -1;
+
 
                                 isam.update(*graph, initial_values);
                                 graph->resize(0);
 
                                 initial_values.clear();
                                 continue;
+
+                                ++state_skip;
                         }
 
-                        ++state_count;
+                        // ++state_count;
                         if (currKey > startKey ) {
                                 if ( lastStep == nextKey ) { break; }
 
 
-                                if (state_count < 1200) // i.e., static for 2 mins.
+                                if (state_count < 600 || state_count > lastStep-600)
                                 {
                                         graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
+                                        full_graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
 
                                         ++factor_count;
                                 }
 
-                                // if skip more than 5 epochs -- reinitialize state est.
-                                if (state_skip > 5)
+                                // if skip more than 10 epochs -- reinitialize state est.
+                                // if (state_skip > 20)
+                                // {
+
+                                // cout << "State Count == " << state_count << " SKIPPED TOO MANY" << endl;
+
+                                // graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, nonBias_Reset));
+                                // ++factor_count;
+
+                                // }
+                                // else {
+                                double scale = (gnssTime - prev_time)*10.0;
+                                cout << "SCALE == " << scale << endl;
+
+                                if (scale == 0) {scale = 1.0; }
+
+                                // nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 5.0*scale, 5.0*scale, 10.0*scale, 1e4*scale, 1e-1*scale).finished());
+
+
+                                // graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-state_skip), initEst, nonBias_ProcessNoise));
+                                if (state_skip < 10)
                                 {
-
-                                        cout << "State Count == " << state_count << " SKIPPED TOO MANY" << endl;
-                                        graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, nonBias_Reset));
+                                        graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, noiseModel::Diagonal::Variances((gtsam::Vector(5) << 2.0*scale, 2.0*scale, 2.0*scale, 1e4*scale, 1e-1*scale).finished()) ));
+                                        full_graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, noiseModel::Diagonal::Variances((gtsam::Vector(5) << 2.0*scale, 2.0*scale, 2.0*scale, 1e4*scale, 1e-1*scale).finished()) ));
+                                        //
+                                        ++factor_count;
                                 }
-                                else {
-                                        double scale = (gnssTime - prev_time)*10.0;
+                                else
+                                {
+                                        LevenbergMarquardtOptimizer optimizer(*full_graph, full_values);
+                                        optimizer.optimize();
+                                        result = optimizer.values();
 
-                                        if (scale == 0) {scale = 1.0; }
+                                        cout << "HERE 1 " << endl;
+                                        prior_nonBias = result.at<nonBiasStates>(X(currKey));
+                                        cout << "HERE 2 " << endl;
 
-                                        nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.5*scale, 0.5*scale, 0.5*scale, 1e3*scale, 1e-3*scale).finished());
+                                        graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, noiseModel::Diagonal::Variances((gtsam::Vector(5) << 2.0*scale, 2.0*scale, 2.0*scale, 1e4*scale, 1e-1*scale).finished()) ));
 
-                                        // graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, nonBias_ProcessNoise));
-                                        graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-state_skip), initEst, nonBias_ProcessNoise));
+                                        full_graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, noiseModel::Diagonal::Variances((gtsam::Vector(5) << 2.0*scale, 2.0*scale, 2.0*scale, 1e4*scale, 1e-1*scale).finished()) ));
+
+                                        ++factor_count;
+
+
                                 }
+                                // }
 
                         }
 
-                        // get the init. estimate to calculate residuals.
                         isam.update(*graph, initial_values);
-                        for (unsigned int j; j < 50; j++ )
-                        {
-                                isam.update();
-                        }
                         result = isam.calculateEstimate();
 
 
@@ -359,15 +404,20 @@ int main(int argc, char* argv[])
                                 }
                                 else
                                 {
+                                        // if obs. match a model. Update the number of points in
+                                        // that cluster.
                                         num_obs.at(ind) = num_obs.at(ind)+1;
                                 }
                         }
 
 
-                        if (ob_count > 4) {
+                        initial_values.clear();
+                        if (ob_count >= 5) {
                                 ++tmp;
+                                ++state_count;
 
-                                isam.update(*graph);
+
+                                isam.update(*graph, initial_values);
                                 isam.update();
                                 result = isam.calculateEstimate();
 
@@ -397,6 +447,12 @@ int main(int argc, char* argv[])
                         }
                         else{
                                 ++state_skip;
+
+                                // if (initial_values.exists(X(currKey)))
+                                // {
+                                //         initial_values.erase(X(currKey));
+                                // }
+                                // isam.update(*graph,initial_values);
                         }
                         output_time = output_time +1;
 
@@ -438,10 +494,10 @@ int main(int argc, char* argv[])
 
                                 residuals.setZero(1000,2);
                                 res_count = -1;
+
                         }
 
                         graph->resize(0);
-                        initial_values.clear();
                         prn_vec.clear();
 
                         auto stop = high_resolution_clock::now();
@@ -451,11 +507,12 @@ int main(int argc, char* argv[])
                              << duration.count() << " microseconds" << endl;
 
                         initial_values.insert(X(nextKey), prior_nonBias);
+                        full_values.insert(X(nextKey), prior_nonBias);
+                        // initial_values.insert(X(nextKey), initEst);
                         ob_count = 0;
                 }
 
         }
-        // isam.saveGraph("gnss.tree");
 
         cout << "\n\n\n\n\n\n" << endl;
         cout << "----------------- Final Mixture MODEL ----------------" << endl;
