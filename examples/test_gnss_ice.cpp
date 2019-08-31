@@ -256,7 +256,7 @@ int main(int argc, char* argv[])
                                 if (initial_values.exists(X(currKey)))
                                 {
                                         initial_values.erase(X(currKey));
-                                        full_values.erase(X(currKey));
+                                        // full_values.erase(X(currKey));
                                 }
                                 initial_values.insert(X(nextKey), prior_nonBias);
                                 full_values.insert(X(nextKey), prior_nonBias);
@@ -319,15 +319,19 @@ int main(int argc, char* argv[])
                                 }
                                 else
                                 {
-                                        LevenbergMarquardtOptimizer optimizer(*full_graph, full_values);
-                                        optimizer.optimize();
-                                        result = optimizer.values();
-
                                         cout << "HERE 1 " << endl;
-                                        prior_nonBias = result.at<nonBiasStates>(X(currKey));
+                                        LevenbergMarquardtOptimizer optimizer(*full_graph, full_values);
                                         cout << "HERE 2 " << endl;
+                                        optimizer.optimize();
+                                        cout << "HERE 3 " << endl;
+                                        result = optimizer.values();
+                                        cout << "HERE 4 " << endl;
+
+                                        prior_nonBias = result.at<nonBiasStates>(X(currKey));
 
                                         graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, noiseModel::Diagonal::Variances((gtsam::Vector(5) << 2.0*scale, 2.0*scale, 2.0*scale, 1e4*scale, 1e-1*scale).finished()) ));
+
+                                        ++factor_count;
 
                                         full_graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, noiseModel::Diagonal::Variances((gtsam::Vector(5) << 2.0*scale, 2.0*scale, 2.0*scale, 1e4*scale, 1e-1*scale).finished()) ));
 
