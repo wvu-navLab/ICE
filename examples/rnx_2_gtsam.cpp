@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
                 ("iono", po::value<string>(&iono_file)->default_value(""),
                 "IonoMap file to read.")
                 ("break_window",  po::value<int>(&break_window)->default_value(100), "Size of window (in samples) to check for cycle-slips")
-                ("break_thresh",  po::value<double>(&break_thresh)->default_value(4.5), "deviation magnitude to classify as phase break")
+                ("break_thresh",  po::value<double>(&break_thresh)->default_value(6.0), "deviation magnitude to classify as phase break")
                 ("usingP1", "Are you using C1 instead of P1?")
                 ("dec", po::value<int>(&dec_int)->default_value(0),
                 "decimate input obs file");
@@ -124,12 +124,12 @@ int main(int argc, char *argv[])
 
         // BELL station nominal position
         // Nom. pos. for the greenhouse dataset.
-        Position nominalPos(856514.1467,-4843013.0689, 4047939.8237);
+        Position nominalPos(856514.1467, -4843013.0689, 4047939.8237);
         // Nom. pos. for the dec12 dataset.
         // Position nomXYZ(856295.3346, -4843033.4111, 4048017.6649);
 
         CorrectCodeBiases corrCode;
-        corrCode.setDCBFile("/localhome/ryan_watson/data/p1p2_12.DCB", "/localhome/ryan_watson/data/p1c1_12.DCB");
+        corrCode.setDCBFile("/home/rmw/Documents/git/ICE/data/shared_data/p1p2_12.DCB", "/home/rmw/Documents/git/ICE/data/shared_data/p1c1_12.DCB");
 
         if (!usingP1) {
                 corrCode.setUsingC1(true);
@@ -160,7 +160,7 @@ int main(int argc, char *argv[])
 
         // Object to correct for SP3 Sat Phase-center offset
         AntexReader antexread;
-        antexread.open( "/localhome/ryan_watson/data/antenna_corr.atx" );
+        antexread.open( "/home/rmw/Documents/git/ICE/data/shared_data/antenna_corr.atx" );
         ComputeSatPCenter svPcenter(SP3EphList, nominalPos);
         svPcenter.setAntexReader( antexread );
 
@@ -283,13 +283,13 @@ int main(int argc, char *argv[])
                 // Iterate through the GNSS Data Structure
                 satTypeValueMap::const_iterator it;
                 typeValueMap::const_iterator itObs;
-                if (gRin.numSats() > 3)
+                if (gRin.numSats() >= 5)
                 {
-                        if ( itsBelowThree > 0 )
-                        {
-                                itsBelowThree = 0;
-                                continue;
-                        }
+                        // if ( itsBelowThree > 0 )
+                        // {
+                        // itsBelowThree = 0;
+                        // continue;
+                        // }
                         for (it = gRin.body.begin(); it!= gRin.body.end(); it++)
                         {
                                 cout << gpstime.week << " ";

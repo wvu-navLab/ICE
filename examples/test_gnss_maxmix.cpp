@@ -10,6 +10,7 @@
 #include <gtsam/inference/Symbol.h>
 #include <gtsam/slam/PriorFactor.h>
 #include <gtsam/slam/BetweenFactor.h>
+#include <gtsam/robustModels/GNSSMaxMix.h>
 #include <gtsam/gnssNavigation/GnssData.h>
 #include <gtsam/gnssNavigation/GnssTools.h>
 #include <gtsam/gnssNavigation/GNSSFactor.h>
@@ -73,7 +74,7 @@ int main(int argc, char* argv[])
         const string red("\033[0;31m");
         const string green("\033[0;32m");
         string confFile, gnssFile, station;
-        double xn, yn, zn, range, phase, rho, gnssTime;
+        double xn, yn, zn, range, phase, rho, gnssTime, mmWeight(1e-2);
         int startKey(0), currKey, startEpoch(0), svn, state_count(0);
         int nThreads(-1), phase_break, break_count(0), nextKey, factor_count(-1), res_count(-1);
         bool printECEF, printENU, printAmb, first_ob(true);
@@ -221,11 +222,17 @@ int main(int argc, char* argv[])
                         phase_arc[svn] = phase_break;
                 }
 
-                double rw = rangeWeight;
-                double pw = phaseWeight;
 
-                // graph->add(boost::make_shared<GNSSFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, diagNoise::Variances( (gtsam::Vector(2) << rw, pw).finished() )));
-                graph->add(boost::make_shared<GNSSFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, diagNoise::Variances( (gtsam::Vector(2) << rw, pw).finished() )));
+                Eigen::VectorXd noiseVec(2);
+                // noiseVec << rangeWeight, phaseWeight;
+                double rw = elDepWeight(satXYZ, nomXYZ, rangeWeight);
+                double pw = elDepWeight(satXYZ, nomXYZ, phaseWeight);
+                noiseVec << rw, pw;
+
+                noiseModel::Diagonal::shared_ptr hypothesis = noiseModel::Diagonal::Variances(noiseVec);
+
+                // Generate phase factor
+                graph->add(boost::make_shared<GNSSMaxMix>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, hypothesis, noiseVec, mmWeight ));
 
                 prn_vec.push_back(svn);
                 factor_count_vec.push_back(++factor_count);

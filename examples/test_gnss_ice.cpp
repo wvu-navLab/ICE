@@ -53,11 +53,8 @@ namespace po = boost::program_options;
 typedef noiseModel::Diagonal diagNoise;
 
 // Intel Threading Building Block
-#ifdef GTSAM_USE_TBB
-  #include <tbb/tbb.h>
-  #undef max // TBB seems to include windows.h and we don't want these macros
-  #undef min
-#endif
+#include <tbb/tbb.h>
+
 
 using symbol_shorthand::X; // nonBiasStates ( dx, dy, dz, trop, cb )
 using symbol_shorthand::G;   // bias states ( Phase Biases )
@@ -67,7 +64,7 @@ int main(int argc, char* argv[])
         // define std out print color
         bool skipped_update(false);
         vector<int> prn_vec;
-        vector<int> factor_count_vec, gnss_count_vec;
+        vector<int> factor_count_vec;
         vector<rnxData> data;
         // vector<faultyRnxData> data;
         const string red("\033[0;31m");
@@ -123,25 +120,16 @@ int main(int argc, char* argv[])
         }
 
 
-        #ifdef GTSAM_USE_TBB
         std::auto_ptr<tbb::task_scheduler_init> init;
         if(nThreads > 0) {
                 init.reset(new tbb::task_scheduler_init(nThreads));
         }
         else
                 cout << green << " \n\n Using threads for all processors" << endl;
-        #else
-        if(nThreads > 0) {
-                cout << red <<" \n\n GTSAM is not compiled with TBB, so threading is"
-                     << " disabled and the --threads option cannot be used."
-                     << endl;
-                exit(1);
-        }
-        #endif
 
         ISAM2DoglegParams doglegParams;
         ISAM2Params parameters;
-        parameters.relinearizeThreshold = 0.1;
+        parameters.relinearizeThreshold = 0.01;
         parameters.relinearizeSkip = 1000;
         ISAM2 isam(parameters);
 
@@ -162,20 +150,17 @@ int main(int argc, char* argv[])
         nonBiasStates initEst(Z_5x1);
         nonBiasStates between_nonBias_State(Z_5x1);
 
-        Values initial_values, full_values;
-        Values result;
+        Values initial_values, result;
 
         noiseModel::Diagonal::shared_ptr nonBias_InitNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.2, 0.2, 0.2, 3e6, 1e-1).finished());
 
-
-        noiseModel::Diagonal::shared_ptr nonBias_Reset = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1e4, 1e4, 1e4, 3e6, 1e-1).finished());
+        noiseModel::Diagonal::shared_ptr nonBias_Reset = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 3e4, 3e4, 3e4, 3e6, 1e-1).finished());
 
         noiseModel::Diagonal::shared_ptr nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 1.0, 1.0, 1.0, 1e3, 1e-3).finished());
 
         noiseModel::Diagonal::shared_ptr initNoise = noiseModel::Diagonal::Variances((gtsam::Vector(1) << 3e6).finished());
 
         NonlinearFactorGraph *graph = new NonlinearFactorGraph();
-        NonlinearFactorGraph *full_graph = new NonlinearFactorGraph();
 
         residuals.setZero(1000,2);
 
@@ -195,6 +180,7 @@ int main(int argc, char* argv[])
 
         for(unsigned int i = startEpoch; i < data.size(); i++ ) {
 
+
                 auto start = high_resolution_clock::now();
 
                 double gnssTime = get<0>(data[i]);
@@ -203,10 +189,8 @@ int main(int argc, char* argv[])
                         first_ob=false;
                         startKey = currKey;
                         graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
-                        full_graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
                         ++factor_count;
                         initial_values.insert(X(currKey), initEst);
-                        full_values.insert(X(currKey), initEst);
                 }
                 int nextKey = get<1>(data[i+1]);
                 int svn = get<2>(data[i]);
@@ -226,128 +210,59 @@ int main(int argc, char* argv[])
                         bias_state[0] = phase-range;
                         if (currKey > startKey) { bias_counter[svn] = bias_counter[svn] +1; }
                         initial_values.insert(G(bias_counter[svn]), bias_state);
-                        full_values.insert(G(bias_counter[svn]), bias_state);
+
                         graph->add(boost::make_shared<PriorFactor<phaseBias> >(G(bias_counter[svn]), bias_state,  initNoise));
-                        full_graph->add(boost::make_shared<PriorFactor<phaseBias> >(G(bias_counter[svn]), bias_state,  initNoise));
+
                         phase_arc[svn] = phase_break;
-                        gnss_count_vec.push_back(++factor_count);
+                        ++factor_count;
                 }
 
                 // graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, globalMixtureModel));
                 graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
-                full_graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
 
                 prn_vec.push_back(svn);
                 factor_count_vec.push_back(++factor_count);
 
                 if (currKey != nextKey && nextKey != 0) {
-                        if (ob_count < 5 || (ob_count < 6 && state_skip > 10) ) {
 
-                                cout << "No obs, state update == "<< state_count << endl;
-
-                                // remove all gnss factors
-                                for (unsigned int i=0; i<factor_count_vec.size(); i++)
-                                {
-                                        graph->remove(factor_count_vec[i]);
-                                        full_graph->remove(factor_count_vec[i]);
-                                }
-
-                                // remove current state node
-                                if (initial_values.exists(X(currKey)))
-                                {
-                                        initial_values.erase(X(currKey));
-                                        // full_values.erase(X(currKey));
-                                }
-                                initial_values.insert(X(nextKey), prior_nonBias);
-                                full_values.insert(X(nextKey), prior_nonBias);
-                                // initial_values.insert(X(nextKey), initEst);
-                                ob_count = 0;
-                                prn_vec.clear();
-                                factor_count_vec.clear();
-                                gnss_count_vec.clear();
-                                factor_count = -1;
-
-
-                                isam.update(*graph, initial_values);
-                                graph->resize(0);
-
-                                initial_values.clear();
-                                continue;
-
-                                ++state_skip;
-                        }
-
-                        // ++state_count;
                         if (currKey > startKey ) {
                                 if ( lastStep == nextKey ) { break; }
 
 
-                                if (state_count < 600 || state_count > lastStep-600)
+                                if (state_count < 600 || state_count > (lastStep-600))
                                 {
                                         graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
-                                        full_graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
 
                                         ++factor_count;
                                 }
 
-                                // if skip more than 10 epochs -- reinitialize state est.
-                                // if (state_skip > 20)
+                                // double scale = (gnssTime - prev_time)*10.0;
+                                //
+                                // if (scale == 0) {scale = 1.0; }
+                                //
+                                // nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 5.0*scale, 5.0*scale, 5.0*scale, 5e3*scale, 1e-1*scale).finished());
+
+                                // if (state_skip < 10)
                                 // {
-
-                                // cout << "State Count == " << state_count << " SKIPPED TOO MANY" << endl;
-
-                                // graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, nonBias_Reset));
-                                // ++factor_count;
-
+                                //
+                                //         graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-state_skip), initEst, nonBias_ProcessNoise));
+                                //
+                                //         ++factor_count;
+                                //
                                 // }
-                                // else {
-                                double scale = (gnssTime - prev_time)*10.0;
-                                cout << "SCALE == " << scale << endl;
-
-                                if (scale == 0) {scale = 1.0; }
-
-                                // nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 5.0*scale, 5.0*scale, 10.0*scale, 1e4*scale, 1e-1*scale).finished());
-
-
-                                // graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-state_skip), initEst, nonBias_ProcessNoise));
-                                if (state_skip < 10)
-                                {
-                                        graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, noiseModel::Diagonal::Variances((gtsam::Vector(5) << 2.0*scale, 2.0*scale, 2.0*scale, 1e4*scale, 1e-1*scale).finished()) ));
-                                        full_graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, noiseModel::Diagonal::Variances((gtsam::Vector(5) << 2.0*scale, 2.0*scale, 2.0*scale, 1e4*scale, 1e-1*scale).finished()) ));
-                                        //
-                                        ++factor_count;
-                                }
-                                else
-                                {
-                                        cout << "HERE 1 " << endl;
-                                        LevenbergMarquardtOptimizer optimizer(*full_graph, full_values);
-                                        cout << "HERE 2 " << endl;
-                                        optimizer.optimize();
-                                        cout << "HERE 3 " << endl;
-                                        result = optimizer.values();
-                                        cout << "HERE 4 " << endl;
-
-                                        prior_nonBias = result.at<nonBiasStates>(X(currKey));
-
-                                        graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, noiseModel::Diagonal::Variances((gtsam::Vector(5) << 2.0*scale, 2.0*scale, 2.0*scale, 1e4*scale, 1e-1*scale).finished()) ));
-
-                                        ++factor_count;
-
-                                        full_graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, noiseModel::Diagonal::Variances((gtsam::Vector(5) << 2.0*scale, 2.0*scale, 2.0*scale, 1e4*scale, 1e-1*scale).finished()) ));
-
-                                        ++factor_count;
-
-
-                                }
-                                // }
+                                // graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, nonBias_ProcessNoise));
+                                graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, nonBias_Reset));
+                                ++factor_count;
 
                         }
-
+                        // try{
                         isam.update(*graph, initial_values);
                         result = isam.calculateEstimate();
+                        // }
+                        // catch(std::exception& e) { cout << e.what() << endl; continue; }
 
 
-                        // Only consider residuals which don't agree with the model
+                        // Only learn from residuals which don't agree with the model
                         int ind(0);
                         double prob, probMax(0.0);
                         gtsam::Matrix cov_min(2,2);
@@ -417,11 +332,13 @@ int main(int argc, char* argv[])
 
                         initial_values.clear();
                         if (ob_count >= 5) {
+
+
+                                // try{
                                 ++tmp;
                                 ++state_count;
 
-
-                                isam.update(*graph, initial_values);
+                                isam.update(*graph);
                                 isam.update();
                                 result = isam.calculateEstimate();
 
@@ -447,16 +364,12 @@ int main(int argc, char* argv[])
                                 }
                                 state_skip = 1;
                                 prev_time = gnssTime;
+                                // }
+                                // catch(std::exception& e) { cout << e.what() << endl; continue; }
 
                         }
                         else{
                                 ++state_skip;
-
-                                // if (initial_values.exists(X(currKey)))
-                                // {
-                                //         initial_values.erase(X(currKey));
-                                // }
-                                // isam.update(*graph,initial_values);
                         }
                         output_time = output_time +1;
 
@@ -511,7 +424,6 @@ int main(int argc, char* argv[])
                              << duration.count() << " microseconds" << endl;
 
                         initial_values.insert(X(nextKey), prior_nonBias);
-                        full_values.insert(X(nextKey), prior_nonBias);
                         // initial_values.insert(X(nextKey), initEst);
                         ob_count = 0;
                 }
