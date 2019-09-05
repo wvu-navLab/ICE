@@ -217,7 +217,6 @@ int main(int argc, char* argv[])
                         ++factor_count;
                 }
 
-                // graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, globalMixtureModel));
                 graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
 
                 prn_vec.push_back(svn);
@@ -236,30 +235,13 @@ int main(int argc, char* argv[])
                                         ++factor_count;
                                 }
 
-                                // double scale = (gnssTime - prev_time)*10.0;
-                                //
-                                // if (scale == 0) {scale = 1.0; }
-                                //
-                                // nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 5.0*scale, 5.0*scale, 5.0*scale, 5e3*scale, 1e-1*scale).finished());
-
-                                // if (state_skip < 10)
-                                // {
-                                //
-                                //         graph->add(boost::make_shared<BetweenFactor<nonBiasStates> >(X(currKey), X(currKey-state_skip), initEst, nonBias_ProcessNoise));
-                                //
-                                //         ++factor_count;
-                                //
-                                // }
-                                // graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, nonBias_ProcessNoise));
                                 graph->add(PriorFactor<nonBiasStates>(X(currKey), prior_nonBias, nonBias_Reset));
                                 ++factor_count;
 
                         }
-                        // try{
+
                         isam.update(*graph, initial_values);
                         result = isam.calculateEstimate();
-                        // }
-                        // catch(std::exception& e) { cout << e.what() << endl; continue; }
 
 
                         // Only learn from residuals which don't agree with the model

@@ -1,5 +1,5 @@
 /*
- * @file test_gnss_l2.cpp
+ * @file test_gnss_dcs.cpp
  * @brief Iterative GPS Range/Phase Estimator with collected data
  * @author Ryan Watson
  */
@@ -12,7 +12,6 @@
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/gnssNavigation/GnssData.h>
 #include <gtsam/gnssNavigation/GnssTools.h>
-#include <gtsam/gnssNavigation/GNSSFactor.h>
 #include <gtsam/gnssNavigation/nonBiasStates.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/gnssNavigation/GNSSMultiModalFactor.h>
@@ -54,11 +53,8 @@ namespace po = boost::program_options;
 typedef noiseModel::Diagonal diagNoise;
 
 // Intel Threading Building Block
-#ifdef GTSAM_USE_TBB
-  #include <tbb/tbb.h>
-  #undef max // TBB seems to include windows.h and we don't want these macros
-  #undef min
-#endif
+#include <tbb/tbb.h>
+
 
 using symbol_shorthand::X; // nonBiasStates ( dx, dy, dz, trop, cb )
 using symbol_shorthand::G;   // bias states ( Phase Biases )
@@ -66,18 +62,19 @@ using symbol_shorthand::G;   // bias states ( Phase Biases )
 int main(int argc, char* argv[])
 {
         // define std out print color
+        bool skipped_update(false);
         vector<int> prn_vec;
         vector<int> factor_count_vec;
         vector<rnxData> data;
-        // vector<faultyRnxData> data;
         const string red("\033[0;31m");
         const string green("\033[0;32m");
         string confFile, gnssFile, station;
-        double xn, yn, zn, range, phase, rho, gnssTime;
-        int startKey(0), currKey, startEpoch(0), svn, state_count(0);
+        double xn, yn, zn, range, phase, rho, gnssTime, prev_time;
+        int startKey(0), currKey, startEpoch(0), svn, numBatch(0), state_count(0), update_count(0);
         int nThreads(-1), phase_break, break_count(0), nextKey, factor_count(-1), res_count(-1);
         bool printECEF, printENU, printAmb, first_ob(true);
         Eigen::MatrixXd residuals;
+        vector<mixtureComponents> globalMixtureModel;
 
         cout.precision(12);
 
@@ -120,28 +117,13 @@ int main(int argc, char* argv[])
                 exit(1);
         }
 
-        // try { data = readGNSSFaulty(gnssFile, 50.0, 10.0, 0.3); }
-        // catch(std::exception& e)
-        // {
-        //         cout << red << "\n\n Cannot read GNSS data file " << endl;
-        //         exit(1);
-        // }
 
-        #ifdef GTSAM_USE_TBB
         std::auto_ptr<tbb::task_scheduler_init> init;
         if(nThreads > 0) {
                 init.reset(new tbb::task_scheduler_init(nThreads));
         }
         else
                 cout << green << " \n\n Using threads for all processors" << endl;
-        #else
-        if(nThreads > 0) {
-                cout << red <<" \n\n GTSAM is not compiled with TBB, so threading is"
-                     << " disabled and the --threads option cannot be used."
-                     << endl;
-                exit(1);
-        }
-        #endif
 
         ISAM2DoglegParams doglegParams;
         ISAM2Params parameters;
@@ -176,15 +158,22 @@ int main(int argc, char* argv[])
 
         noiseModel::Diagonal::shared_ptr initNoise = noiseModel::Diagonal::Variances((gtsam::Vector(1) << 3e6).finished());
 
-        // noiseModel::Diagonal::shared_ptr nonBias_InitNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 10.0, 10.0, 10.0, 3e8, 1e-1).finished());
-        //
-        // noiseModel::Diagonal::shared_ptr nonBias_ProcessNoise = noiseModel::Diagonal::Variances((gtsam::Vector(5) << 0.1, 0.1, 0.1, 3e6, 3e-5).finished());
-        //
-        // noiseModel::Diagonal::shared_ptr initNoise = noiseModel::Diagonal::Variances((gtsam::Vector(1) << 100).finished());
-
         NonlinearFactorGraph *graph = new NonlinearFactorGraph();
 
+        residuals.setZero(1000,2);
+
+        // For the dcs model, we will use a mixture model with 1 component
+        Eigen::RowVectorXd m(2);
+        m << 0.0, 0.0;
+
+        // Add component 1. (i.e., the assumed error covariance)
+        Eigen::MatrixXd c(2,2);
+        c<< std::pow(rangeWeight,2), 0.0, 0.0, std::pow(phaseWeight,2);
+        globalMixtureModel.push_back(boost::make_tuple(0, 0, 0.0, m, c));
+
         int lastStep = get<0>(data.back());
+
+        std::vector<int> num_obs (1000, 0);
 
         for(unsigned int i = startEpoch; i < data.size(); i++ ) {
 
@@ -194,7 +183,8 @@ int main(int argc, char* argv[])
                 double gnssTime = get<0>(data[i]);
                 int currKey = get<1>(data[i]);
                 if (first_ob) {
-                        startKey = currKey; first_ob=false;
+                        first_ob=false;
+                        startKey = currKey;
                         graph->add(PriorFactor<nonBiasStates>(X(currKey), initEst,  nonBias_InitNoise));
                         ++factor_count;
                         initial_values.insert(X(currKey), initEst);
@@ -219,20 +209,19 @@ int main(int argc, char* argv[])
                         graph->add(boost::make_shared<PriorFactor<phaseBias> >(G(bias_counter[svn]), bias_state,  initNoise));
 
                         phase_arc[svn] = phase_break;
+                        ++factor_count;
                 }
 
-                double rw = rangeWeight;
-                double pw = phaseWeight;
-
-                // graph->add(boost::make_shared<GNSSFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, prop_xyz, diagNoise::Variances( (gtsam::Vector(2) << rw, pw).finished() )));
-                graph->add(boost::make_shared<GNSSFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, diagNoise::Variances( (gtsam::Vector(2) << rw, pw).finished() )));
+                graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
 
                 prn_vec.push_back(svn);
                 factor_count_vec.push_back(++factor_count);
 
                 if (currKey != nextKey && nextKey != 0) {
+
                         if (currKey > startKey ) {
                                 if ( lastStep == nextKey ) { break; }
+
 
                                 if (state_count < 600 || state_count > (lastStep-600))
                                 {
@@ -246,14 +235,10 @@ int main(int argc, char* argv[])
 
                         }
 
-                        // make number of updates equal between ICE and L2.
-                        try {
-                                isam.update(*graph, initial_values);
-                                isam.update();
-                                isam.update();
-                                result = isam.calculateEstimate();
-                        }
-                        catch(std::exception& e) { cout << e.what() << endl; continue; }
+                        isam.update(*graph, initial_values);
+                        isam.update();
+                        isam.update();
+                        result = isam.calculateEstimate();
 
                         prior_nonBias = result.at<nonBiasStates>(X(currKey));
                         Point3 delta_xyz = (gtsam::Vector(3) << prior_nonBias.x(), prior_nonBias.y(), prior_nonBias.z()).finished();
@@ -276,9 +261,16 @@ int main(int argc, char* argv[])
                                 cout << endl;
                         }
 
+                        ++state_count;
+                        output_time = output_time +1;
+
+                        factor_count_vec.clear();
+                        factor_count = -1;
+
                         graph->resize(0);
                         initial_values.clear();
                         prn_vec.clear();
+
                         auto stop = high_resolution_clock::now();
                         auto duration = duration_cast<microseconds>(stop - start);
 
@@ -289,6 +281,6 @@ int main(int argc, char* argv[])
                 }
 
         }
-        // isam.saveGraph("gnss.tree");
+
         return 0;
 }
