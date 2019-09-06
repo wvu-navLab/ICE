@@ -12,9 +12,9 @@
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/gnssNavigation/GnssData.h>
 #include <gtsam/gnssNavigation/GnssTools.h>
+#include <gtsam/gnssNavigation/GNSSDCSFactor.h>
 #include <gtsam/gnssNavigation/nonBiasStates.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
-#include <gtsam/gnssNavigation/GNSSMultiModalFactor.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
 
 
@@ -158,18 +158,18 @@ int main(int argc, char* argv[])
 
         noiseModel::Diagonal::shared_ptr initNoise = noiseModel::Diagonal::Variances((gtsam::Vector(1) << 3e6).finished());
 
+        // set dcs kernel with as 3-sigma from inlier cov model
+        Vector2 kernelWidth;
+        kernelWidth << rangeWeight*3.0, phaseWeight*3.0;
+
         NonlinearFactorGraph *graph = new NonlinearFactorGraph();
 
         residuals.setZero(1000,2);
 
-        // For the dcs model, we will use a mixture model with 1 component
-        Eigen::RowVectorXd m(2);
-        m << 0.0, 0.0;
+        // For the dcs, make robust GTSAM noise model
+        Eigen::MatrixXd cov_model(2,2);
+        cov_model << std::pow(rangeWeight,2), 0.0, 0.0, std::pow(phaseWeight,2);
 
-        // Add component 1. (i.e., the assumed error covariance)
-        Eigen::MatrixXd c(2,2);
-        c<< std::pow(rangeWeight,2), 0.0, 0.0, std::pow(phaseWeight,2);
-        globalMixtureModel.push_back(boost::make_tuple(0, 0, 0.0, m, c));
 
         int lastStep = get<0>(data.back());
 
@@ -212,7 +212,7 @@ int main(int argc, char* argv[])
                         ++factor_count;
                 }
 
-                graph->add(boost::make_shared<GNSSMultiModalFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, globalMixtureModel));
+                graph->add(boost::make_shared<GNSSDCSFactor>(X(currKey), G(bias_counter[svn]), obs, satXYZ, nomXYZ, cov_model, kernelWidth));
 
                 prn_vec.push_back(svn);
                 factor_count_vec.push_back(++factor_count);
