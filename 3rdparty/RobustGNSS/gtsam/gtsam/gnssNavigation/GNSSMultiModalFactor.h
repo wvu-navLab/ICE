@@ -42,6 +42,7 @@ Point3 satXYZ_;
 Point3 nomXYZ_;
 nonBiasStates h_;
 Vector2 measured_;
+mutable gtsam::Matrix2 cov_min_;
 vector<merge::mixtureComponents> gmm_;
 
 public:
@@ -99,6 +100,7 @@ virtual size_t dim() const {
         return 5;
 }
 
+
 std::size_t size() const {
         return 2;
 }
@@ -135,31 +137,7 @@ virtual boost::shared_ptr<gtsam::GaussianFactor> linearize(
                 terms[j].second.swap(A[j]);
         }
 
-        double prob, probMax;
-        probMax = 0.0;
-        int ind(0);
-        gtsam::Matrix cov_min(2,2);
-        for (int i=0; i<gmm_.size(); i++)
-        {
-                merge::mixtureComponents mixtureComp = gmm_[i];
-
-                SharedGaussian G = gtsam::noiseModel::Gaussian::Covariance(mixtureComp.get<4>());
-                gtsam::Vector errW = G->whiten(b);
-
-                double quadform  = (b).transpose() * (mixtureComp.get<4>()).inverse() * (b);
-                double norm = std::pow(std::sqrt(2 * M_PI),-1) * std::pow((mixtureComp.get<4>()).determinant(), -0.5);
-
-                prob =  norm * exp(-0.5 * quadform);
-
-                if (prob >= probMax)
-                {
-                        ind = i;
-                        probMax = prob;
-                        cov_min = mixtureComp.get<4>();
-                }
-        }
-
-        auto jacobianFactor = GaussianFactor::shared_ptr( new JacobianFactor(terms, -b, noiseModel::Diagonal::Variances((gtsam::Vector(2) << cov_min(0,0), cov_min(1,1)).finished()) ));
+        auto jacobianFactor = GaussianFactor::shared_ptr( new JacobianFactor(terms, -b, noiseModel::Diagonal::Variances((gtsam::Vector(2) << cov_min_(0,0), cov_min_(1,1)).finished()) ));
 
         return jacobianFactor;
 }

@@ -207,19 +207,19 @@ vector<merge::mixtureComponents> merge::updateObs(vector<merge::mixtureComponent
         unsigned int N(0);
         for (unsigned int i=0; i<gmm.size(); i++)
         {
-                N+= numObs.at(i);
+                N += numObs.at(i);
         }
 
         for (unsigned int i=0; i<gmm.size(); i++)
         {
                 // update total num of obs.
-                gmm[i].get<0>() = gmm[i].get<0>() + N;
+                gmm[i].get<0>() += N;
                 if (numObs.at(i) != 0 )
                 {
                         // update num of obs in component
-                        gmm[i].get<1>() = gmm[i].get<1>() +numObs.at(i);
+                        gmm[i].get<1>() += numObs.at(i);
                         // update components weight.
-                        gmm[i].get<2>() = gmm[i].get<1>() / gmm[i].get<0>();
+                        gmm[i].get<2>() = gmm[i].get<1>() / double(gmm[i].get<0>());
                 }
         }
         return gmm;
@@ -457,7 +457,6 @@ merge::observationModel merge::getMixtureComponent(vector<merge::mixtureComponen
                 double err = (obs-mean)*cov.inverse()*(observation-mean.transpose());
                 modelProb = -1 * log(err);
 
-                // modelProb = (1/(sqrt(doublePi*cov.determinant()))) * (exp(err));
                 if (modelProb < minProb)
                 {
                         minProb = modelProb;

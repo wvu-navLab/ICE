@@ -59,6 +59,12 @@ typedef noiseModel::Diagonal diagNoise;
 using symbol_shorthand::X; // nonBiasStates ( dx, dy, dz, trop, cb )
 using symbol_shorthand::G;   // bias states ( Phase Biases )
 
+// remove this later
+Eigen::MatrixXd Tw_inv;
+Eigen::RowVectorXd means;
+// remove this later
+
+
 int main(int argc, char* argv[])
 {
         // define std out print color
@@ -66,7 +72,6 @@ int main(int argc, char* argv[])
         vector<int> prn_vec;
         vector<int> factor_count_vec;
         vector<rnxData> data;
-        // vector<faultyRnxData> data;
         const string red("\033[0;31m");
         const string green("\033[0;32m");
         string confFile, gnssFile, station;
@@ -75,8 +80,15 @@ int main(int argc, char* argv[])
         int startKey(0), currKey, startEpoch(0), svn, numBatch(0), state_count(0), update_count(0);
         int nThreads(-1), phase_break, break_count(0), nextKey, factor_count(-1), res_count(-1);
         bool printECEF, printENU, printAmb, first_ob(true);
-        Eigen::MatrixXd residuals;
+        Eigen::MatrixXd residuals, all_residuals;
         vector<mixtureComponents> globalMixtureModel;
+
+        string res_str = "all.residuals";
+        ofstream res_os(res_str);
+
+        string res_out_str = "outliers.residuals";
+        ofstream res_out_os(res_out_str);
+
 
         cout.precision(12);
 
@@ -249,7 +261,7 @@ int main(int argc, char* argv[])
                         double prob, probMax(0.0);
                         gtsam::Matrix cov_min(2,2);
                         Eigen::RowVectorXd mean_min(2);
-                        Eigen::VectorXd res(2), res_2(2), res_min(2);
+                        Eigen::VectorXd res(2);
 
                         for (int j = 0; j<factor_count_vec.size(); j++)
                         {
@@ -262,7 +274,6 @@ int main(int argc, char* argv[])
 
                                         Eigen::RowVectorXd mean = mixtureComp.get<3>();
 
-                                        res_2 << res(0) - mean(0), res(1) - mean(1);
                                         double quadform  = (res).transpose() * (mixtureComp.get<4>()).inverse() * (res);
                                         double norm = std::pow(std::sqrt(2 * M_PI),-1) * std::pow((mixtureComp.get<4>()).determinant(), -0.5);
 
@@ -274,9 +285,10 @@ int main(int argc, char* argv[])
                                                 probMax = prob;
                                                 cov_min = mixtureComp.get<4>();
                                                 mean_min = mixtureComp.get<3>();
-                                                res_min = res_2;
                                         }
                                 }
+
+                                res_os << res(0) << " " << res(1) << endl;
 
                                 // Use z-test to see if residuals is considered an outlier
                                 double z_r = (res(0))/std::sqrt(cov_min(0,0));
@@ -290,14 +302,18 @@ int main(int argc, char* argv[])
                                         {
                                                 residuals.conservativeResize(residuals.rows()+1, residuals.cols());
 
-                                                residuals.row(residuals.rows()-1) = graph->at(factor_count_vec[j])->residual(result).transpose();
+                                                residuals.row(residuals.rows()-1) = res.transpose();
+
+                                                res_out_os << res(0) << " " << res(1) << endl;
 
                                                 graph->remove(factor_count_vec[j]);
                                                 ob_count-=1;
                                         }
                                         else
                                         {
-                                                residuals.block(res_count,0,1,2) << graph->at(factor_count_vec[j])->residual(result).transpose();
+                                                residuals.block(res_count,0,1,2) << res.transpose();
+
+                                                res_out_os << res(0) << " " << res(1) << endl;
 
                                                 graph->remove(factor_count_vec[j]);
                                                 ob_count-=1;
@@ -316,7 +332,6 @@ int main(int argc, char* argv[])
                         if (ob_count >= 5) {
 
 
-                                // try{
                                 ++tmp;
                                 ++state_count;
 
@@ -346,8 +361,6 @@ int main(int argc, char* argv[])
                                 }
                                 state_skip = 1;
                                 prev_time = gnssTime;
-                                // }
-                                // catch(std::exception& e) { cout << e.what() << endl; continue; }
 
                         }
                         else{
@@ -358,16 +371,8 @@ int main(int argc, char* argv[])
                         factor_count_vec.clear();
                         factor_count = -1;
 
-
-                        // string res_str = "batch_" + to_string(numBatch) + ".residuals";
-                        // ofstream res_os(res_str);
                         if (res_count > 1000)
                         {
-                                // ++numBatch;
-                                // for (unsigned int i=0; i<residuals.rows()-1; i++)
-                                // {
-                                //         res_os << residuals.block(i,0,1,2) << endl;
-                                // }
 
                                 StickBreak weights;
                                 vector<GaussWish> clusters;
@@ -382,14 +387,14 @@ int main(int argc, char* argv[])
                                 // merge the curr and prior mixture models.
                                 globalMixtureModel = mergeMixtureModel(residuals, qZ, globalMixtureModel, clusters, weights, 0.05, 20);
 
-                                // cout << "\n\n\n\n\n\n" << endl;
-                                // cout << "----------------- Merged MODEL ----------------" << endl;
-                                // for (int i=0; i<globalMixtureModel.size(); i++)
-                                // {
-                                //         mixtureComponents mc = (globalMixtureModel)[i];
-                                //         auto cov = mc.get<4>();
-                                //         cout << mc.get<0>() << " " << mc.get<1>() << " "  <<  mc.get<2>() << "    " << mc.get<3>() <<"     "<< cov(0,0) << " " << cov(0,1) << " " << cov(1,1) <<"     "<<"\n\n" << endl;
-                                // }
+                                cout << "\n\n\n\n\n\n" << endl;
+                                cout << "----------------- Merged MODEL ----------------" << endl;
+                                for (int i=0; i<globalMixtureModel.size(); i++)
+                                {
+                                        mixtureComponents mc = (globalMixtureModel)[i];
+                                        auto cov = mc.get<4>();
+                                        cout << mc.get<0>() << " " << mc.get<1>() << " "  <<  mc.get<2>() << "    " << mc.get<3>() <<"     "<< cov(0,0) << " " << cov(0,1) << " " << cov(1,1) <<"     "<<"\n\n" << endl;
+                                }
 
                                 residuals.setZero(1000,2);
                                 res_count = -1;
@@ -406,14 +411,13 @@ int main(int argc, char* argv[])
                              << duration.count() << " microseconds" << endl;
 
                         initial_values.insert(X(nextKey), prior_nonBias);
-                        // initial_values.insert(X(nextKey), initEst);
                         ob_count = 0;
                 }
 
         }
 
         cout << "\n\n\n\n\n\n" << endl;
-        cout << "----------------- Final Mixture MODEL ----------------" << endl;
+        cout << "----------------- Final Incremental Mixture MODEL ----------------" << endl;
         for (int i=0; i<globalMixtureModel.size(); i++)
         {
                 mixtureComponents mc = globalMixtureModel[i];
