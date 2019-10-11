@@ -7,7 +7,7 @@ This repository contains the software release for "Robust Incremental State Esti
 <br/>
 
 
-> Recent advances in the fields of robotics and automation have spurred significant interest in robust state estimation. To enable robust state estimation, several methodologies have been proposed. One such technique, which has shown promising performance, is the concept of iteratively estimating a Gaussian Mixture Model (GMM), based upon the state estimation residuals, to characterize the measurement uncertainty model. Through this iterative process, the measurement uncertainty model is more accurately characterized, which enables robust state estimation through the appropriate de-weighting of erroneous observations. This approach, however, has traditionally requires a batch estimation framework to enable the estimation of the measurement uncertainty model, which is not advantageous to most real-time robotic applications. Within this paper, we propose a novel extension to the measurement uncertainty model estimation paradigm. Specifically, we propose an efficient, incremental extension of the methodology. The incremental covariance estimation (ICE) approach, as detailed within this paper, is evaluated on several collected data sets, where it is shown to provide a significant increase in localization accuracy, when compared to other state-of-the-art algorithms. 
+> Recent advances in the fields of robotics and automation have spurred significant interest in robust state estimation. To enable robust state estimation, several methodologies have been proposed. One such technique, which has shown promising performance, is the concept of iteratively estimating a Gaussian Mixture Model (GMM), based upon the state estimation residuals, to characterize the measurement uncertainty model. Through this iterative process, the measurement uncertainty model is more accurately characterized, which enables robust state estimation through the appropriate de-weighting of erroneous observations. This approach, however, has traditionally required a batch estimation framework to enable the estimation of the measurement uncertainty model, which is not advantageous to robotic applications. In this paper, we propose an efficient, incremental  extension to the measurement uncertainty model estimation paradigm. The incremental covariance estimation (ICE) approach, as detailed within this paper, is evaluated on several collected data sets, where it is shown to provide a significant increase in localization accuracy when compared to other state-of-the-art robust, incremental estimation algorithms. 
 
 
 <br/>
@@ -57,7 +57,7 @@ If you utilze this software for an academic purpose, please consider using the f
 ### 2) Clone repository to local machine  
 ````bash
 
-git clone https://github.com/wvu-navLab/Enabling-Robust-State-Estimation-through-Measurement-Error-Covariance-Adaptation.git
+git clone https://github.com/wvu-navLab/ICE.git
 
 ````
 
@@ -65,7 +65,7 @@ git clone https://github.com/wvu-navLab/Enabling-Robust-State-Estimation-through
 
 ````bash
 
-cd Enabling-Robust-State-Estimation-through-Measurement-Error-Covariance-Adaptation
+cd ICE
 ./build.sh
 
 ````
@@ -77,4 +77,4 @@ chmod +x run_all.sh
 ./run_all.sh
 ````
 
-This will write all of the generated results to the *test* directory (*../test*). To duplicate the plots generated within the paper run the following command. (Note: this assumes that you have a matlab alias set. See this [link](https://www.mathworks.com/matlabcentral/answers/98220-how-do-i-create-a-shortcut-or-link-to-matlab)  for instructions. ).
+This will write all of the generated results to the *test* directory (*../test*).
