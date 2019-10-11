@@ -28,22 +28,22 @@ cd "$TDIR"
 rm -rf "$TDIR/lq/l2" "$TDIR/hq/l2"
 
 echo "running L2 1/6"
-"$BDIR/test_gnss_bce" -i "$D_LQ_1" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 0 --dir "$TDIR/lq/l2/01/" > /dev/null
+"$BDIR/test_gnss_l2" -i "$D_LQ_1" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 0 --dir "$TDIR/lq/l2/01/" > /dev/null
 
 echo "running L2 2/6"
-"$BDIR/test_gnss_bce" -i "$D_HQ_1" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 0 --dir "$TDIR/hq/l2/01/" > /dev/null
+"$BDIR/test_gnss_l2" -i "$D_HQ_1" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 0 --dir "$TDIR/hq/l2/01/" > /dev/null
 
 echo "running L2 3/6"
-"$BDIR/test_gnss_bce" -i "$D_LQ_2"  --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 0 --dir "$TDIR/lq/l2/02/" > /dev/null
+"$BDIR/test_gnss_l2" -i "$D_LQ_2"  --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 0 --dir "$TDIR/lq/l2/02/" > /dev/null
 
 echo "running L2 4/6"
-"$BDIR/test_gnss_bce" -i "$D_HQ_2" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 0 --dir "$TDIR/hq/l2/02/" >  /dev/null
+"$BDIR/test_gnss_l2" -i "$D_HQ_2" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 0 --dir "$TDIR/hq/l2/02/" >  /dev/null
 
 echo "running L2 5/6"
-"$BDIR/test_gnss_bce" -i "$D_LQ_3" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 0 --dir "$TDIR/lq/l2/03/" >  /dev/null
+"$BDIR/test_gnss_l2" -i "$D_LQ_3" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 0 --dir "$TDIR/lq/l2/03/" >  /dev/null
 
 echo "running L2 6/6"
-"$BDIR/test_gnss_bce" -i "$D_HQ_3" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 0 --dir "$TDIR/hq/l2/03/"  >  /dev/null
+"$BDIR/test_gnss_l2" -i "$D_HQ_3" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 0 --dir "$TDIR/hq/l2/03/"  >  /dev/null
 
 #######################
 ## DCS
@@ -99,22 +99,22 @@ echo "running MM 6/6"
 rm -rf "$TDIR/lq/ice" "$TDIR/hq/ice"
 
 echo "running ICE 1/6"
-"$BDIR/test_gnss_ice" -i "$D_LQ_1" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/lq/bce/01/" > /dev/null
+"$BDIR/test_gnss_ice" -i "$D_LQ_1" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/lq/ice/01/" > /dev/null
 
 echo "running ICE 2/6"
-"$BDIR/test_gnss_ice" -i "$D_HQ_1" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/hq/bce/01/" > /dev/null
+"$BDIR/test_gnss_ice" -i "$D_HQ_1" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/hq/ice/01/" > /dev/null
 
 echo "running ICE 3/6"
-"$BDIR/test_gnss_ice" -i "$D_LQ_2"  --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/lq/bce/02/" > /dev/null
+"$BDIR/test_gnss_ice" -i "$D_LQ_2"  --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/lq/ice/02/" > /dev/null
 
 echo "running ICE 4/6"
-"$BDIR/test_gnss_ice" -i "$D_HQ_2" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/hq/bce/02/" >  /dev/null
+"$BDIR/test_gnss_ice" -i "$D_HQ_2" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/hq/ice/02/" >  /dev/null
 
 echo "running ICE 5/6"
-"$BDIR/test_gnss_ice" -i "$D_LQ_3" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/lq/bce/03/" >  /dev/null
+"$BDIR/test_gnss_ice" -i "$D_LQ_3" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/lq/ice/03/" >  /dev/null
 
 echo "running ICE 6/6"
-"$BDIR/test_gnss_ice" -i "$D_HQ_3" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/hq/bce/03/"  >  /dev/null
+"$BDIR/test_gnss_ice" -i "$D_HQ_3" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/hq/ice/03/"  >  /dev/null
 
 clear
 echo -e "\n\n\n\n ----------------------------------------------- \n"
