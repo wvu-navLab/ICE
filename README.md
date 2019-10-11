@@ -2,7 +2,8 @@
 
 ## Overview
 
-This repository contains the software release for "Robust Incremental State Estimation through Covariance Adaptation". The objective of the software release is described through the associated abstract.
+This repository contains the software release for "Robust Incremental State Estimation through Covariance Adaptation". The objective of the software release is described through the associated abstract. For a more thorough discussion, please see the [description document](https://github.com/wvu-navLab/ICE/blob/master/description.pdf).
+
 <br/>
 <br/>
 
