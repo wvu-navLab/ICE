@@ -94,27 +94,27 @@ echo "running MM 6/6"
 
 
 #######################
-## BCE
+## ICE
 #######################
-rm -rf "$TDIR/lq/bce" "$TDIR/hq/bce"
+rm -rf "$TDIR/lq/ice" "$TDIR/hq/ice"
 
-echo "running BCE 1/6"
-"$BDIR/test_gnss_bce" -i "$D_LQ_1" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/lq/bce/01/" > /dev/null
+echo "running ICE 1/6"
+"$BDIR/test_gnss_ice" -i "$D_LQ_1" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/lq/bce/01/" > /dev/null
 
-echo "running BCE 2/6"
-"$BDIR/test_gnss_bce" -i "$D_HQ_1" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/hq/bce/01/" > /dev/null
+echo "running ICE 2/6"
+"$BDIR/test_gnss_ice" -i "$D_HQ_1" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/hq/bce/01/" > /dev/null
 
-echo "running BCE 3/6"
-"$BDIR/test_gnss_bce" -i "$D_LQ_2"  --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/lq/bce/02/" > /dev/null
+echo "running ICE 3/6"
+"$BDIR/test_gnss_ice" -i "$D_LQ_2"  --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/lq/bce/02/" > /dev/null
 
-echo "running BCE 4/6"
-"$BDIR/test_gnss_bce" -i "$D_HQ_2" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/hq/bce/02/" >  /dev/null
+echo "running ICE 4/6"
+"$BDIR/test_gnss_ice" -i "$D_HQ_2" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/hq/bce/02/" >  /dev/null
 
-echo "running BCE 5/6"
-"$BDIR/test_gnss_bce" -i "$D_LQ_3" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/lq/bce/03/" >  /dev/null
+echo "running ICE 5/6"
+"$BDIR/test_gnss_ice" -i "$D_LQ_3" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/lq/bce/03/" >  /dev/null
 
-echo "running BCE 6/6"
-"$BDIR/test_gnss_bce" -i "$D_HQ_3" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/hq/bce/03/"  >  /dev/null
+echo "running ICE 6/6"
+"$BDIR/test_gnss_ice" -i "$D_HQ_3" --writeECEF --writeENU --writeBias --phaseScale 100 --robustIter 100 --dir "$TDIR/hq/bce/03/"  >  /dev/null
 
 clear
 echo -e "\n\n\n\n ----------------------------------------------- \n"
