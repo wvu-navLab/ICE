@@ -51,6 +51,7 @@ If you utilze this software for an academic purpose, please consider using the f
 
 #### Required
 * Boost -->  ```` sudo apt-get install libboost-all-dev ````
+	* Note: this has only been tested with boost --version 1.58 
 * CMake -->  ```` sudo apt-get install cmake ````
 * OpenMP --> ```` sudo apt install libomp-dev ````
 
@@ -74,6 +75,8 @@ cd ICE
 ### 4) Test
 
 Let's run a test on dataset 1 with low-quality observations. To change the utilized dataset, use one of the following arguments {1,2,3}_{lq,hq} after the *run_me.sh* command. (e.g., ./run_me.sh 3_hq).
+
+
 ````bash
 cd examples
 chmod +x run_me.sh
@@ -81,3 +84,13 @@ chmod +x run_me.sh
 ````
 
 This will write all of the generated results to the *test* directory (*../test*). All of the 'truth' data, utilized for validation, is housed in the *~/ICE/data/truth/* directory
+
+For this specific example, the table printed to the screen should match the one provided below.
+
+````bash
+type    med_    mean_   var_    max_
+L2      2.57    2.52    1.99    10.78
+DCS     0.64    0.99    0.95    9.71
+MM      1.63    1.66    1.10    10.06
+ICE     0.57    0.72    0.46    13.19
+````bash
