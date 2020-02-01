@@ -72,10 +72,12 @@ cd ICE
 ````
 
 ### 4) Test
+
+Let's run a test on dataset 1 with low-quality observations. To change the utilized dataset, use one of the following arguments {1,2,3}_{lq,hq} after the *run_me.sh* command. (e.g., ./run_me.sh 3_hq).
 ````bash
 cd examples
-chmod +x run_all.sh
-./run_all.sh
+chmod +x run_me.sh
+./run_me.sh 1_lq
 ````
 
 This will write all of the generated results to the *test* directory (*../test*).
