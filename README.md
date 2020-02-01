@@ -80,4 +80,4 @@ chmod +x run_me.sh
 ./run_me.sh 1_lq
 ````
 
-This will write all of the generated results to the *test* directory (*../test*).
+This will write all of the generated results to the *test* directory (*../test*). All of the 'truth' data, utilized for validation, is housed in the *~/ICE/data/truth/* directory
