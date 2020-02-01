@@ -18,7 +18,7 @@ DIR="$(dirname "$CURRDIR")"
 TDIR="$DIR/test"
 BDIR="$DIR/examples/build"
 DDIR="$DIR/data"
-GDIR="$DIR/data/gtsam"
+GDIR="$DIR/data/gtsam_ice"
 
 cd $DDIR/conf
 
@@ -28,6 +28,7 @@ sed -i "s|LOCATION|$GDIR|" curr_run.conf
 sed -i "s|DATAFILE|$1|" curr_run.conf
 
 
+## Run all of the estimators
 echo "Running ICE"
 "$BDIR/test_gnss_ice" -c curr_run.conf | grep "xyz" | awk '{print $2 " " $3 " " $4 " " $5}' > "$TDIR/ice.xyz"
 
@@ -39,3 +40,13 @@ echo "Running DCS"
 
 echo "Running L2"
 "$BDIR/test_gnss_l2" -c curr_run.conf | grep "xyz" | awk '{print $2 " " $3 " " $4 " " $5}' > "$TDIR/l2.xyz"
+
+
+## Get the stats. for the runs. NOTE: this requires that you have matlab installed
+export MATLABPATH="$DDIR/truth":"$CURRDIR/make_plots":"$CURRDIR/make_plots/utils"
+
+fileNum=$(echo $1 | cut -d '_' -f1)
+truth_dir="$DDIR/truth/drive_$fileNum.xyz"
+matlab  -nodisplay -nojvm -r "get_stats('"$TDIR"', '"$truth_dir"');exit"
+clear;
+cat "$TDIR/stats.txt"
