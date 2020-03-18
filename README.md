@@ -14,6 +14,23 @@ This repository contains the software release for "Robust Incremental State Esti
 <br/>
 <br/>
 
+If you utilize this software for an academic purpose, please consider using the following citation:
+```
+@article{watson2020robust,
+        title={Robust Incremental State Estimation through Covariance Adaptation},
+        author={Watson, Ryan M, Gross, Jason N, Taylor, Clark N, and Leishman, Robert C},
+        journal={IEEE Robotics and Automation Letters},
+        year={2020}
+}
+```
+
+<br/>
+<br/>
+
+
+<br/>
+<br/>
+
 This software benefits from several open-source software packages.
 * [*Georgia Tech Smoothing And Mapping (GTSAM)*](https://bitbucket.org/gtborg/gtsam/src/develop/) -- contains factor graph based state estimation algorithms
 	* GTSAM was updated for GNSS signal processing within
