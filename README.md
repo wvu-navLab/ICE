@@ -16,11 +16,14 @@ This repository contains the software release for "Robust Incremental State Esti
 
 If you utilize this software for an academic purpose, please consider using the following citation:
 ```
-@article{watson2020robust,
-        title={Robust Incremental State Estimation through Covariance Adaptation},
-        author={Watson, Ryan M, Gross, Jason N, Taylor, Clark N, and Leishman, Robert C},
-        journal={IEEE Robotics and Automation Letters},
-        year={2020}
+@article{watson2020robust, 
+         author={R. M. {Watson} and J. N. {Gross} and C. N. {Taylor} and R. C. {Leishman}},
+	 journal={IEEE Robotics and Automation Letters},
+	 title={Robust Incremental State Estimation Through Covariance Adaptation},
+	 year={2020},
+	 volume={5},
+	 number={2},
+	 pages={3737-3744}
 }
 ```
 
